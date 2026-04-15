@@ -1,0 +1,11 @@
+<odoo>
+  <record id="module_category_controlo_gasoleo" model="ir.module.category">
+    <field name="name">Controlo de Gasóleo</field>
+    <field name="sequence">90</field>
+  </record>
+
+  <record id="group_controlo_gasoleo_user" model="res.groups">
+    <field name="name">Utilizadores</field>
+    <field name="category_id" ref="controlo_gasoleo.module_category_controlo_gasoleo"/>
+  </record>
+</odoo>

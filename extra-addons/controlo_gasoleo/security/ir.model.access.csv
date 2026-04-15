@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_veiculo,access_veiculo,model_gasoleo_veiculo,controlo_gasoleo.group_controlo_gasoleo_user,1,1,1,1
+access_condutor,access_condutor,model_gasoleo_condutor,controlo_gasoleo.group_controlo_gasoleo_user,1,1,1,1
+access_registo,access_registo,model_gasoleo_registo_kms,controlo_gasoleo.group_controlo_gasoleo_user,1,0,1,1
+access_deposito,access_deposito,model_gasoleo_deposito,controlo_gasoleo.group_controlo_gasoleo_user,1,0,1,1
+access_entrada_deposito,access_entrada_deposito,model_gasoleo_entrada_deposito,controlo_gasoleo.group_controlo_gasoleo_user,1,0,1,1

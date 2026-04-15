@@ -1,0 +1,102 @@
+<odoo>
+  <data>
+
+    <record id="view_resposta_cliente_form" model="ir.ui.view">
+      <field name="name">qualidade.resposta.cliente.form</field>
+      <field name="model">qualidade.resposta.cliente</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <div class="oe_title">
+              <h1>Resposta Qualidade - Cliente</h1>
+            </div>
+
+            <group>
+              <field name="reclamacao_id"/>
+              <field name="estado_resposta"/>
+              <field name="data"/>
+            </group>
+
+            <group string="Dados do Formulário">
+              <field name="utilizador_id" readonly="1"/>
+              <field name="armazem" readonly="1"/>
+              <field name="cliente" readonly="1"/>
+              <field name="codigo_artigo" readonly="1"/>
+              <field name="descricao_artigo" readonly="1"/>
+              <field name="lote" readonly="1"/>
+              <field name="descricao_reclamacao" readonly="1"/>
+              <field name="anexos_formulario_ids" widget="many2many_binary" readonly="1"/>
+            </group>
+
+            <group string="Resposta da Qualidade">
+              <field name="causa"/>
+              <field name="acoes_correcao"/>
+              <field name="acoes_corretivas"/>
+              <div class="o_form_label">(corrigem origem do problema)</div>
+              <field name="categoria"/>
+              <field name="origem"/>
+              <field name="gravidade"/>
+              <field name="responsavel_id"/>
+              <field name="aprovado_por_id"/>
+              <field name="data_conclusao"/>
+              <field name="verificacao_eficacia"/>
+              <field name="data_fecho"/>
+              <field name="observacoes"/>
+            </group>
+
+            <group string="Evidências / Anexos">
+              <field name="anexos_ids" widget="many2many_binary"/>
+            </group>
+          </sheet>
+        </form>
+      </field>
+    </record>
+
+    <record id="action_responder_cliente" model="ir.actions.act_window">
+      <field name="name">Responder (Cliente)</field>
+      <field name="res_model">qualidade.resposta.cliente</field>
+      <field name="view_mode">form</field>
+      <field name="view_id" ref="view_resposta_cliente_form"/>
+      <field name="target">new</field>
+      <field name="context">{'default_reclamacao_id': active_id}</field>
+    </record>
+
+    <record id="view_qualidade_cliente_list" model="ir.ui.view">
+      <field name="name">qualidade.form.reclama.cliente.list</field>
+      <field name="model">form.reclama.cliente</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="create_date" string="Criado em" optional="show"/>
+          <field name="cliente" optional="show"/>
+          <field name="codigo_artigo" optional="show"/>
+          <field name="descricao_artigo" optional="hide"/>
+          <field name="lote" optional="show"/>
+          <field name="ultima_resposta_estado" string="Estado" widget="badge" optional="show"
+                 decoration-danger="ultima_resposta_estado == 'aberto'"
+                 decoration-warning="ultima_resposta_estado == 'pendente'"
+                 decoration-success="ultima_resposta_estado == 'fechado'"/>
+          <field name="ultima_categoria" optional="show"/>
+          <field name="ultima_origem" optional="show"/>
+          <field name="ultima_gravidade" optional="show"/>
+          <field name="ultima_responsavel_id" optional="show"/>
+          <field name="ultima_aprovado_por_id" optional="show"/>
+          <field name="ultima_data_conclusao" optional="show"/>
+          <field name="ultima_causa" optional="hide"/>
+          <field name="ultima_acoes_corretivas" optional="hide"/>
+          <field name="ultima_verificacao_eficacia" optional="hide"/>
+          <field name="ultima_data_fecho" optional="hide"/>
+          <field name="ultima_observacoes" optional="hide"/>
+          <button name="action_responder_cliente" type="object" string="Responder" class="btn-primary"/>
+        </list>
+      </field>
+    </record>
+
+    <record id="action_qualidade_cliente" model="ir.actions.act_window">
+      <field name="name">Reclamações Clientes</field>
+      <field name="res_model">form.reclama.cliente</field>
+      <field name="view_mode">list</field>
+      <field name="view_id" ref="view_qualidade_cliente_list"/>
+    </record>
+
+  </data>
+</odoo>

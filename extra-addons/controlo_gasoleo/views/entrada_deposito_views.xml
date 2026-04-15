@@ -1,0 +1,33 @@
+<odoo>
+  <data>
+    <record id="view_entrada_deposito_list" model="ir.ui.view">
+      <field name="name">gasoleo.entrada.deposito.list</field>
+      <field name="model">gasoleo.entrada.deposito</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="data"/>
+          <field name="deposito_id"/>
+          <field name="fornecedor"/>
+          <field name="litros"/>
+        </list>
+      </field>
+    </record>
+
+    <record id="view_entrada_deposito_form" model="ir.ui.view">
+      <field name="name">gasoleo.entrada.deposito.form</field>
+      <field name="model">gasoleo.entrada.deposito</field>
+      <field name="arch" type="xml">
+        <form edit="false">
+          <sheet>
+            <group>
+              <field name="data"/>
+              <field name="deposito_id" required="1"/>
+              <field name="fornecedor"/>
+              <field name="litros"/>
+            </group>
+          </sheet>
+        </form>
+      </field>
+    </record>
+  </data>
+</odoo>

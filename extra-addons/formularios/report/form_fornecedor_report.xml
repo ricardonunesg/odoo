@@ -1,0 +1,37 @@
+<odoo>
+  <data>
+    <record id="action_report_form_fornecedor" model="ir.actions.report">
+      <field name="name">Formulário Reclamação Fornecedor</field>
+      <field name="model">form.reclama.fornecedor</field>
+      <field name="report_type">qweb-pdf</field>
+      <field name="report_name">formularios.report_form_fornecedor_document</field>
+      <field name="report_file">formularios.report_form_fornecedor_document</field>
+      <field name="print_report_name">'Formulario_Fornecedor_%s' % (object.id)</field>
+      <field name="binding_model_id" eval="False"/>
+      <field name="binding_type">report</field>
+      <field name="binding_view_types"></field>
+    </record>
+
+    <template id="report_form_fornecedor_document">
+      <t t-call="web.html_container">
+        <t t-foreach="docs" t-as="o">
+          <t t-call="web.external_layout">
+            <div class="page">
+              <h2>Formulário de Reclamação - Fornecedor</h2>
+              <p><strong>Utilizador:</strong> <span t-esc="o.user_id.name"/></p>
+              <p><strong>Armazém:</strong> <span t-esc="dict(o._fields['armazem'].selection).get(o.armazem)"/></p>
+              <p><strong>Fornecedor:</strong> <span t-esc="o.fornecedor"/></p>
+              <p><strong>Código Artigo:</strong> <span t-esc="o.codigo_artigo"/></p>
+              <p><strong>Descrição Artigo:</strong> <span t-esc="o.descricao_artigo"/></p>
+              <p><strong>Lote / Guia remessa / Fatura:</strong> <span t-esc="o.lote_guia_fatura"/></p>
+              <p><strong>Descrição da Reclamação:</strong></p>
+              <div t-esc="o.descricao_reclamacao"/>
+              <p><strong>Ações de Correção:</strong></p>
+              <div t-esc="o.acoes_correcao or ''"/>
+            </div>
+          </t>
+        </t>
+      </t>
+    </template>
+  </data>
+</odoo>

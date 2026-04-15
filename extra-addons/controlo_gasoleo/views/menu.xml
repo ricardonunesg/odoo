@@ -1,0 +1,83 @@
+<odoo>
+  <data>
+
+    <record id="action_veiculos" model="ir.actions.act_window">
+      <field name="name">Veículos</field>
+      <field name="res_model">gasoleo.veiculo</field>
+      <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_condutores" model="ir.actions.act_window">
+      <field name="name">Condutores</field>
+      <field name="res_model">gasoleo.condutor</field>
+      <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_registos" model="ir.actions.act_window">
+      <field name="name">Registo de Quilómetros</field>
+      <field name="res_model">gasoleo.registo.kms</field>
+      <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_depositos" model="ir.actions.act_window">
+      <field name="name">Depósitos</field>
+      <field name="res_model">gasoleo.deposito</field>
+      <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_entradas_deposito" model="ir.actions.act_window">
+      <field name="name">Entradas de Depósito</field>
+      <field name="res_model">gasoleo.entrada.deposito</field>
+      <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ✅ Menu raiz protegido pelo grupo -->
+    <menuitem
+      id="menu_gasoleo_root"
+      name="Controlo de Gasóleo"
+      sequence="10"
+      groups="controlo_gasoleo.group_controlo_gasoleo_user"/>
+
+    <!-- ✅ Submenus também protegidos -->
+    <menuitem
+      id="menu_veiculos"
+      name="Veículos"
+      parent="menu_gasoleo_root"
+      action="controlo_gasoleo.action_veiculos"
+      sequence="10"
+      groups="controlo_gasoleo.group_controlo_gasoleo_user"/>
+
+    <menuitem
+      id="menu_condutores"
+      name="Condutores"
+      parent="menu_gasoleo_root"
+      action="controlo_gasoleo.action_condutores"
+      sequence="20"
+      groups="controlo_gasoleo.group_controlo_gasoleo_user"/>
+
+    <menuitem
+      id="menu_registos"
+      name="Registo de Quilómetros"
+      parent="menu_gasoleo_root"
+      action="controlo_gasoleo.action_registos"
+      sequence="30"
+      groups="controlo_gasoleo.group_controlo_gasoleo_user"/>
+
+    <menuitem
+      id="menu_depositos"
+      name="Depósitos"
+      parent="menu_gasoleo_root"
+      action="controlo_gasoleo.action_depositos"
+      sequence="40"
+      groups="controlo_gasoleo.group_controlo_gasoleo_user"/>
+
+    <menuitem
+      id="menu_entradas_deposito"
+      name="Entradas de Depósito"
+      parent="menu_gasoleo_root"
+      action="controlo_gasoleo.action_entradas_deposito"
+      sequence="50"
+      groups="controlo_gasoleo.group_controlo_gasoleo_user"/>
+
+  </data>
+</odoo>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <menuitem id="tarefas_root" name="Tarefas" sequence="10" groups="tarefas.group_tarefas_manager"/>
+
+  <record id="action_tarefas_template" model="ir.actions.act_window">
+    <field name="name">Templates</field>
+    <field name="res_model">tarefas.template</field>
+    <field name="view_mode">list,form</field>
+  </record>
+
+  <menuitem id="tarefas_templates_menu"
+            name="Templates"
+            parent="tarefas_root"
+            action="action_tarefas_template"
+            sequence="10"
+            groups="tarefas.group_tarefas_manager"/>
+</odoo>

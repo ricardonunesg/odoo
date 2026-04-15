@@ -1,0 +1,35 @@
+<odoo>
+  <data>
+    <record id="view_condutor_list" model="ir.ui.view">
+      <field name="name">gasoleo.condutor.list</field>
+      <field name="model">gasoleo.condutor</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="nome"/>
+          <field name="apelido"/>
+        </list>
+      </field>
+    </record>
+
+    <record id="view_condutor_form" model="ir.ui.view">
+      <field name="name">gasoleo.condutor.form</field>
+      <field name="model">gasoleo.condutor</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <div class="oe_title">
+              <h1>
+                <field name="nome" placeholder="Primeiro Nome" class="oe_inline"/>
+                <field name="apelido" placeholder="Último Nome" class="oe_inline"/>
+              </h1>
+            </div>
+            <group>
+              <field name="nome"/>
+              <field name="apelido"/>
+            </group>
+          </sheet>
+        </form>
+      </field>
+    </record>
+  </data>
+</odoo>

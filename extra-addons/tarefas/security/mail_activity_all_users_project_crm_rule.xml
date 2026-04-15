@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- Todos os users internos podem VER activities de Project/CRM -->
+  <record id="rule_all_users_read_activities_project_crm" model="ir.rule">
+    <field name="name">All Users: read activities (Project + CRM)</field>
+    <field name="model_id" ref="mail.model_mail_activity"/>
+    <field name="domain_force">[('res_model', 'in', ['project.task','crm.lead'])]</field>
+    <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    <field name="perm_read" eval="1"/>
+    <field name="perm_write" eval="0"/>
+    <field name="perm_create" eval="0"/>
+    <field name="perm_unlink" eval="0"/>
+  </record>
+</odoo>

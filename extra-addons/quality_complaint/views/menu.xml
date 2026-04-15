@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- App (sem parent: fica como menu raiz) -->
+    <menuitem id="menu_quality_root"
+              name="Qualidade"
+              action="quality_complaint.action_quality_customer_complaint"
+              sequence="20"
+              groups="base.group_user"
+              web_icon="quality_complaint,static/description/icon.png"/>
+
+    <!-- Submenu (opcional) -->
+    <menuitem id="menu_quality_complaints"
+              name="Reclamações de Cliente"
+              parent="menu_quality_root"
+              action="quality_complaint.action_quality_customer_complaint"
+              sequence="10"
+              groups="base.group_user"/>
+</odoo>

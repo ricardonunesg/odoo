@@ -1,0 +1,8 @@
+<odoo>
+  <data>
+    <record id="group_qualidade_eng" model="res.groups">
+      <field name="name">Qualidade - Engenheiros</field>
+      <field name="category_id" ref="base.module_category_hidden"/>
+    </record>
+  </data>
+</odoo>

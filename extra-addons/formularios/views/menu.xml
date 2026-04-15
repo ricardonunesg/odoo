@@ -1,0 +1,37 @@
+<odoo>
+  <data>
+
+    <record id="action_form_reclama_cliente" model="ir.actions.act_window">
+      <field name="name">1 - Formulário Reclamações de Clientes</field>
+      <field name="res_model">form.reclama.cliente</field>
+      <field name="view_mode">form</field>
+      <field name="view_id" ref="view_form_reclama_cliente_form"/>
+      <field name="target">current</field>
+      <field name="context">{'form_view_initial_mode': 'edit', 'default_user_id': uid}</field>
+    </record>
+
+    <record id="action_form_reclama_fornecedor" model="ir.actions.act_window">
+      <field name="name">2 - Formulário Reclamações de Fornecedores</field>
+      <field name="res_model">form.reclama.fornecedor</field>
+      <field name="view_mode">form</field>
+      <field name="view_id" ref="view_form_reclama_fornecedor_form"/>
+      <field name="target">current</field>
+      <field name="context">{'form_view_initial_mode': 'edit', 'default_user_id': uid}</field>
+    </record>
+
+    <menuitem id="menu_formularios_root" name="Formulários" sequence="10"/>
+
+    <menuitem id="menu_form_cliente"
+              name="1 - Formulário Reclamações de Clientes"
+              parent="menu_formularios_root"
+              action="formularios.action_form_reclama_cliente"
+              sequence="10"/>
+
+    <menuitem id="menu_form_fornecedor"
+              name="2 - Formulário Reclamações de Fornecedores"
+              parent="menu_formularios_root"
+              action="formularios.action_form_reclama_fornecedor"
+              sequence="20"/>
+
+  </data>
+</odoo>

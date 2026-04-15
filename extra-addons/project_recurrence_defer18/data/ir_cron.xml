@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="ir_cron_project_deferred_occurrence" model="ir.cron">
+    <field name="name">Project: Create deferred recurring tasks</field>
+    <field name="model_id" ref="project.model_project_task_recurrence"/>
+    <field name="state">code</field>
+    <field name="code">model._cron_create_deferred_occurrences()</field>
+    <field name="interval_number">1</field>
+    <field name="interval_type">days</field>
+    <field name="active">True</field>
+  </record>
+</odoo>

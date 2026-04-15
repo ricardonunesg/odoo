@@ -1,0 +1,11 @@
+<odoo>
+  <data>
+    <menuitem id="menu_qualidade_root" name="Qualidade" sequence="20" groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_clientes" name="Reclamações Clientes"
+              parent="menu_qualidade_root" action="qualidade_reclamacoes.action_qualidade_cliente" sequence="10"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_fornecedores" name="Reclamações Fornecedores"
+              parent="menu_qualidade_root" action="qualidade_reclamacoes.action_qualidade_fornecedor" sequence="20"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+  </data>
+</odoo>
