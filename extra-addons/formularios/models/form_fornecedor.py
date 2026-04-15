@@ -44,6 +44,13 @@ class FormReclamacaoFornecedor(models.Model):
             if not rec.anexos_ids:
                 raise ValidationError("É obrigatório anexar pelo menos 1 ficheiro no 'Documento da Reclamação'.")
 
+    def _vincular_anexos_ao_registo(self):
+        for rec in self:
+            rec.anexos_ids.sudo().write({
+                'res_model': rec._name,
+                'res_id': rec.id,
+            })
+
     def _get_destinatarios_email(self):
         emails = set(EMAILS_FIXOS)
         if self.user_id and self.user_id.email:
@@ -93,8 +100,15 @@ class FormReclamacaoFornecedor(models.Model):
     def create(self, vals_list):
         records = super().create(vals_list)
         for rec in records:
+            rec._vincular_anexos_ao_registo()
             rec._enviar_email_notificacao()
         return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'anexos_ids' in vals:
+            self._vincular_anexos_ao_registo()
+        return res
 
 
     def action_imprimir_pdf(self):
