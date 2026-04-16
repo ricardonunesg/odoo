@@ -9,6 +9,7 @@
         'security/security.xml',
         'security/attachment_access.xml',
         'security/ir.model.access.csv',
+        'views/dashboard_views.xml',
         'views/qualidade_cliente_views.xml',
         'views/qualidade_fornecedor_views.xml',
         'views/menu.xml',

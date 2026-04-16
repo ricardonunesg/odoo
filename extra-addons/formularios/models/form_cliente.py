@@ -7,7 +7,8 @@ EMAILS_FIXOS = [
     'Bruno.simoes@mirazeite.com',
     'Ricardo.machado@mirazeite.com',
     'Rita.faroleira@mirazeite.com',
-'goncalo.simoes@mirazeite.com',
+    'goncalo.simoes@mirazeite.com',
+    'pedro.santos@mirazeite.com',
 ]
 
 class FormReclamacaoCliente(models.Model):

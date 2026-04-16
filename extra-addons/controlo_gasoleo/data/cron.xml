@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="controlo_gasoleo_action_relatorio_mensal" model="ir.actions.server">
+    <field name="name">Gasóleo: Enviar relatório mensal</field>
+    <field name="model_id" ref="controlo_gasoleo.model_gasoleo_registo_kms"/>
+    <field name="state">code</field>
+    <field name="code">model._cron_enviar_relatorio_mensal_gasoleo()</field>
+  </record>
+
+  <record id="controlo_gasoleo_cron_relatorio_mensal" model="ir.cron">
+    <field name="cron_name">Gasóleo: Enviar relatório mensal</field>
+    <field name="active">True</field>
+    <field name="user_id" ref="base.user_admin"/>
+    <field name="interval_number">1</field>
+    <field name="interval_type">months</field>
+    <field name="priority">5</field>
+    <field name="ir_actions_server_id" ref="controlo_gasoleo_action_relatorio_mensal"/>
+    <field name="nextcall">2026-04-28 07:00:00</field>
+  </record>
+</odoo>

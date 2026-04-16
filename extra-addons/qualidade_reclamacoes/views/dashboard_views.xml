@@ -1,0 +1,393 @@
+<odoo>
+  <data>
+    <record id="view_qualidade_dashboard_search" model="ir.ui.view">
+      <field name="name">qualidade.reclamacao.dashboard.search</field>
+      <field name="model">qualidade.reclamacao.dashboard</field>
+      <field name="arch" type="xml">
+        <search string="Dashboard Reclamações">
+          <field name="entidade"/>
+          <field name="codigo_artigo"/>
+          <field name="tipo"/>
+          <field name="estado_resposta"/>
+          <field name="categoria"/>
+          <field name="origem"/>
+          <field name="gravidade"/>
+          <field name="responsavel_id"/>
+          <filter name="sem_resposta" string="Sem Resposta" domain="[('estado_resposta', '=', 'sem_resposta')]"/>
+          <filter name="abertas" string="Abertas" domain="[('estado_resposta', '=', 'aberto')]"/>
+          <filter name="pendentes" string="Pendentes" domain="[('estado_resposta', '=', 'pendente')]"/>
+          <filter name="fechadas" string="Fechadas" domain="[('estado_resposta', '=', 'fechado')]"/>
+          <filter name="acoes_corretivas_pendentes" string="Ações Corretivas Pendentes" domain="[('acoes_corretivas_pendentes', '=', True)]"/>
+          <separator/>
+          <filter name="fora_sla_7" string="Fora SLA 7 Dias" domain="[('fora_sla_7', '=', True)]"/>
+          <filter name="fora_sla_15" string="Fora SLA 15 Dias" domain="[('fora_sla_15', '=', True)]"/>
+          <filter name="fora_sla_30" string="Fora SLA 30 Dias" domain="[('fora_sla_30', '=', True)]"/>
+          <separator/>
+          <filter name="criadas_30_dias" string="Últimos 30 Dias" domain="[('data_criacao', '&gt;=', (context_today() - relativedelta(days=30)).strftime('%Y-%m-%d'))]"/>
+          <group expand="0" string="Agrupar por">
+            <filter name="group_tipo" string="Tipo" context="{'group_by': 'tipo'}"/>
+            <filter name="group_estado" string="Estado" context="{'group_by': 'estado_resposta'}"/>
+            <filter name="group_categoria" string="Categoria" context="{'group_by': 'categoria'}"/>
+            <filter name="group_gravidade" string="Gravidade" context="{'group_by': 'gravidade'}"/>
+            <filter name="group_origem" string="Origem" context="{'group_by': 'origem'}"/>
+            <filter name="group_responsavel" string="Responsável" context="{'group_by': 'responsavel_id'}"/>
+            <filter name="group_mes" string="Mês" context="{'group_by': 'data_criacao:month'}"/>
+          </group>
+        </search>
+      </field>
+    </record>
+
+    <record id="view_qualidade_kpi_kanban" model="ir.ui.view">
+      <field name="name">qualidade.reclamacao.kpi.kanban</field>
+      <field name="model">qualidade.reclamacao.kpi</field>
+      <field name="arch" type="xml">
+        <kanban create="0" edit="0" delete="0" class="o_kanban_dashboard">
+          <field name="name"/>
+          <field name="value"/>
+          <field name="suffix"/>
+          <field name="category"/>
+          <templates>
+            <t t-name="card">
+              <div class="p-3">
+                <div class="text-muted">
+                  <field name="name"/>
+                </div>
+                <div class="fs-2 fw-bold">
+                  <field name="value"/>
+                  <field name="suffix"/>
+                </div>
+                <div>
+                  <field name="category" widget="badge"
+                         decoration-info="category == 'geral'"
+                         decoration-warning="category == 'sla'"
+                         decoration-danger="category == 'pendencias'"/>
+                </div>
+              </div>
+            </t>
+          </templates>
+        </kanban>
+      </field>
+    </record>
+
+    <record id="view_qualidade_kpi_list" model="ir.ui.view">
+      <field name="name">qualidade.reclamacao.kpi.list</field>
+      <field name="model">qualidade.reclamacao.kpi</field>
+      <field name="arch" type="xml">
+        <list create="0" edit="0" delete="0">
+          <field name="sequence" column_invisible="1"/>
+          <field name="name"/>
+          <field name="value"/>
+          <field name="suffix"/>
+          <field name="category"/>
+        </list>
+      </field>
+    </record>
+
+    <record id="view_qualidade_dashboard_graph" model="ir.ui.view">
+      <field name="name">qualidade.reclamacao.dashboard.graph</field>
+      <field name="model">qualidade.reclamacao.dashboard</field>
+      <field name="arch" type="xml">
+        <graph string="Resolução de Reclamações" type="bar" stacked="True">
+          <field name="estado_resposta"/>
+          <field name="tipo"/>
+          <field name="quantidade" type="measure"/>
+        </graph>
+      </field>
+    </record>
+
+    <record id="view_qualidade_dashboard_tipo_graph" model="ir.ui.view">
+      <field name="name">qualidade.reclamacao.dashboard.tipo.graph</field>
+      <field name="model">qualidade.reclamacao.dashboard</field>
+      <field name="arch" type="xml">
+        <graph string="Cliente vs Fornecedor" type="bar" stacked="True">
+          <field name="tipo"/>
+          <field name="estado_resposta"/>
+          <field name="quantidade" type="measure"/>
+        </graph>
+      </field>
+    </record>
+
+    <record id="view_qualidade_dashboard_categoria_graph" model="ir.ui.view">
+      <field name="name">qualidade.reclamacao.dashboard.categoria.graph</field>
+      <field name="model">qualidade.reclamacao.dashboard</field>
+      <field name="arch" type="xml">
+        <graph string="Reclamações por Categoria" type="bar" stacked="True">
+          <field name="categoria"/>
+          <field name="estado_resposta"/>
+          <field name="quantidade" type="measure"/>
+        </graph>
+      </field>
+    </record>
+
+    <record id="view_qualidade_dashboard_origem_graph" model="ir.ui.view">
+      <field name="name">qualidade.reclamacao.dashboard.origem.graph</field>
+      <field name="model">qualidade.reclamacao.dashboard</field>
+      <field name="arch" type="xml">
+        <graph string="Reclamações por Origem" type="bar" stacked="True">
+          <field name="origem"/>
+          <field name="gravidade"/>
+          <field name="quantidade" type="measure"/>
+        </graph>
+      </field>
+    </record>
+
+    <record id="view_qualidade_dashboard_gravidade_graph" model="ir.ui.view">
+      <field name="name">qualidade.reclamacao.dashboard.gravidade.graph</field>
+      <field name="model">qualidade.reclamacao.dashboard</field>
+      <field name="arch" type="xml">
+        <graph string="Reclamações por Gravidade" type="bar" stacked="True">
+          <field name="gravidade"/>
+          <field name="estado_resposta"/>
+          <field name="quantidade" type="measure"/>
+        </graph>
+      </field>
+    </record>
+
+    <record id="view_qualidade_dashboard_categoria_gravidade_graph" model="ir.ui.view">
+      <field name="name">qualidade.reclamacao.dashboard.categoria.gravidade.graph</field>
+      <field name="model">qualidade.reclamacao.dashboard</field>
+      <field name="arch" type="xml">
+        <graph string="Categoria x Gravidade" type="bar" stacked="True">
+          <field name="categoria"/>
+          <field name="gravidade"/>
+          <field name="quantidade" type="measure"/>
+        </graph>
+      </field>
+    </record>
+
+    <record id="view_qualidade_dashboard_origem_gravidade_graph" model="ir.ui.view">
+      <field name="name">qualidade.reclamacao.dashboard.origem.gravidade.graph</field>
+      <field name="model">qualidade.reclamacao.dashboard</field>
+      <field name="arch" type="xml">
+        <graph string="Origem x Gravidade" type="bar" stacked="True">
+          <field name="origem"/>
+          <field name="gravidade"/>
+          <field name="quantidade" type="measure"/>
+        </graph>
+      </field>
+    </record>
+
+    <record id="view_qualidade_dashboard_tempo_fecho_graph" model="ir.ui.view">
+      <field name="name">qualidade.reclamacao.dashboard.tempo.fecho.graph</field>
+      <field name="model">qualidade.reclamacao.dashboard</field>
+      <field name="arch" type="xml">
+        <graph string="Tempo de Fecho por Gravidade" type="bar">
+          <field name="gravidade"/>
+          <field name="tipo"/>
+          <field name="dias_para_fechar" type="measure"/>
+        </graph>
+      </field>
+    </record>
+
+    <record id="view_qualidade_dashboard_pivot" model="ir.ui.view">
+      <field name="name">qualidade.reclamacao.dashboard.pivot</field>
+      <field name="model">qualidade.reclamacao.dashboard</field>
+      <field name="arch" type="xml">
+        <pivot string="Resolução de Reclamações" disable_linking="True">
+          <field name="estado_resposta" type="row"/>
+          <field name="tipo" type="col"/>
+          <field name="quantidade" type="measure"/>
+          <field name="dias_para_fechar" type="measure"/>
+        </pivot>
+      </field>
+    </record>
+
+    <record id="view_qualidade_dashboard_categoria_gravidade_pivot" model="ir.ui.view">
+      <field name="name">qualidade.reclamacao.dashboard.categoria.gravidade.pivot</field>
+      <field name="model">qualidade.reclamacao.dashboard</field>
+      <field name="arch" type="xml">
+        <pivot string="Categoria x Gravidade" disable_linking="True">
+          <field name="categoria" type="row"/>
+          <field name="gravidade" type="col"/>
+          <field name="quantidade" type="measure"/>
+        </pivot>
+      </field>
+    </record>
+
+    <record id="view_qualidade_dashboard_origem_gravidade_pivot" model="ir.ui.view">
+      <field name="name">qualidade.reclamacao.dashboard.origem.gravidade.pivot</field>
+      <field name="model">qualidade.reclamacao.dashboard</field>
+      <field name="arch" type="xml">
+        <pivot string="Origem x Gravidade" disable_linking="True">
+          <field name="origem" type="row"/>
+          <field name="gravidade" type="col"/>
+          <field name="quantidade" type="measure"/>
+        </pivot>
+      </field>
+    </record>
+
+    <record id="view_qualidade_dashboard_resolucao_pivot" model="ir.ui.view">
+      <field name="name">qualidade.reclamacao.dashboard.resolucao.pivot</field>
+      <field name="model">qualidade.reclamacao.dashboard</field>
+      <field name="arch" type="xml">
+        <pivot string="Resolução por Responsável" disable_linking="True">
+          <field name="responsavel_id" type="row"/>
+          <field name="estado_resposta" type="col"/>
+          <field name="quantidade" type="measure"/>
+          <field name="dias_para_fechar" type="measure"/>
+        </pivot>
+      </field>
+    </record>
+
+    <record id="view_qualidade_dashboard_list" model="ir.ui.view">
+      <field name="name">qualidade.reclamacao.dashboard.list</field>
+      <field name="model">qualidade.reclamacao.dashboard</field>
+      <field name="arch" type="xml">
+        <list create="0" edit="0" delete="0">
+          <field name="data_criacao"/>
+          <field name="tipo"/>
+          <field name="reclamacao_ref"/>
+          <field name="entidade"/>
+          <field name="estado_resposta" widget="badge"
+                 decoration-muted="estado_resposta == 'sem_resposta'"
+                 decoration-danger="estado_resposta == 'aberto'"
+                 decoration-warning="estado_resposta == 'pendente'"
+                 decoration-success="estado_resposta == 'fechado'"/>
+          <field name="categoria" optional="show"/>
+          <field name="gravidade" optional="show"/>
+          <field name="origem" optional="show"/>
+          <field name="responsavel_id" optional="show"/>
+          <field name="data_fecho" optional="show"/>
+          <field name="dias_para_fechar" optional="show" sum="Total"/>
+          <field name="dias_em_aberto" optional="show" sum="Total"/>
+          <field name="fora_sla_7" optional="hide"/>
+          <field name="fora_sla_15" optional="hide"/>
+          <field name="fora_sla_30" optional="hide"/>
+          <field name="acoes_corretivas_pendentes" optional="show"/>
+        </list>
+      </field>
+    </record>
+
+    <record id="action_qualidade_kpi" model="ir.actions.act_window">
+      <field name="name">Indicadores</field>
+      <field name="res_model">qualidade.reclamacao.kpi</field>
+      <field name="view_mode">kanban,list</field>
+      <field name="view_id" ref="view_qualidade_kpi_kanban"/>
+    </record>
+
+    <record id="action_qualidade_dashboard" model="ir.actions.act_window">
+      <field name="name">Visão Geral</field>
+      <field name="res_model">qualidade.reclamacao.dashboard</field>
+      <field name="view_mode">graph,pivot,list</field>
+      <field name="search_view_id" ref="view_qualidade_dashboard_search"/>
+      <field name="context">{'search_default_group_estado': 1}</field>
+      <field name="help">Analise a resolução das reclamações por estado, tipo, gravidade, categoria, origem, responsável e tempo até fecho.</field>
+    </record>
+
+    <record id="action_qualidade_dashboard_tipo" model="ir.actions.act_window">
+      <field name="name">Cliente vs Fornecedor</field>
+      <field name="res_model">qualidade.reclamacao.dashboard</field>
+      <field name="view_mode">graph,pivot,list</field>
+      <field name="view_id" ref="view_qualidade_dashboard_tipo_graph"/>
+      <field name="search_view_id" ref="view_qualidade_dashboard_search"/>
+      <field name="context">{'search_default_group_tipo': 1}</field>
+    </record>
+
+    <record id="action_qualidade_dashboard_clientes" model="ir.actions.act_window">
+      <field name="name">Estatísticas Clientes</field>
+      <field name="res_model">qualidade.reclamacao.dashboard</field>
+      <field name="view_mode">graph,pivot,list</field>
+      <field name="view_id" ref="view_qualidade_dashboard_categoria_gravidade_graph"/>
+      <field name="domain">[('tipo', '=', 'cliente'), ('categoria', '!=', False), ('gravidade', '!=', False)]</field>
+      <field name="search_view_id" ref="view_qualidade_dashboard_search"/>
+      <field name="context">{'search_default_group_categoria': 1}</field>
+    </record>
+
+    <record id="action_qualidade_dashboard_fornecedores" model="ir.actions.act_window">
+      <field name="name">Estatísticas Fornecedores</field>
+      <field name="res_model">qualidade.reclamacao.dashboard</field>
+      <field name="view_mode">graph,pivot,list</field>
+      <field name="view_id" ref="view_qualidade_dashboard_categoria_gravidade_graph"/>
+      <field name="domain">[('tipo', '=', 'fornecedor'), ('categoria', '!=', False), ('gravidade', '!=', False)]</field>
+      <field name="search_view_id" ref="view_qualidade_dashboard_search"/>
+      <field name="context">{'search_default_group_categoria': 1}</field>
+    </record>
+
+    <record id="action_qualidade_dashboard_categoria" model="ir.actions.act_window">
+      <field name="name">Categoria</field>
+      <field name="res_model">qualidade.reclamacao.dashboard</field>
+      <field name="view_mode">graph,pivot,list</field>
+      <field name="view_id" ref="view_qualidade_dashboard_categoria_graph"/>
+      <field name="domain">[('categoria', '!=', False)]</field>
+      <field name="search_view_id" ref="view_qualidade_dashboard_search"/>
+      <field name="context">{'search_default_group_categoria': 1}</field>
+    </record>
+
+    <record id="action_qualidade_dashboard_origem" model="ir.actions.act_window">
+      <field name="name">Origem</field>
+      <field name="res_model">qualidade.reclamacao.dashboard</field>
+      <field name="view_mode">graph,pivot,list</field>
+      <field name="view_id" ref="view_qualidade_dashboard_origem_graph"/>
+      <field name="domain">[('origem', '!=', False), ('gravidade', '!=', False)]</field>
+      <field name="search_view_id" ref="view_qualidade_dashboard_search"/>
+      <field name="context">{'search_default_group_origem': 1}</field>
+    </record>
+
+    <record id="action_qualidade_dashboard_gravidade" model="ir.actions.act_window">
+      <field name="name">Gravidade</field>
+      <field name="res_model">qualidade.reclamacao.dashboard</field>
+      <field name="view_mode">graph,pivot,list</field>
+      <field name="view_id" ref="view_qualidade_dashboard_gravidade_graph"/>
+      <field name="domain">[('gravidade', '!=', False)]</field>
+      <field name="search_view_id" ref="view_qualidade_dashboard_search"/>
+      <field name="context">{'search_default_group_gravidade': 1}</field>
+    </record>
+
+    <record id="action_qualidade_dashboard_categoria_gravidade" model="ir.actions.act_window">
+      <field name="name">Categoria x Gravidade</field>
+      <field name="res_model">qualidade.reclamacao.dashboard</field>
+      <field name="view_mode">graph,pivot,list</field>
+      <field name="view_id" ref="view_qualidade_dashboard_categoria_gravidade_graph"/>
+      <field name="domain">[('categoria', '!=', False), ('gravidade', '!=', False)]</field>
+      <field name="search_view_id" ref="view_qualidade_dashboard_search"/>
+      <field name="context">{'pivot_measures': ['quantidade']}</field>
+    </record>
+
+    <record id="action_qualidade_dashboard_origem_gravidade" model="ir.actions.act_window">
+      <field name="name">Origem x Gravidade</field>
+      <field name="res_model">qualidade.reclamacao.dashboard</field>
+      <field name="view_mode">graph,pivot,list</field>
+      <field name="view_id" ref="view_qualidade_dashboard_origem_gravidade_graph"/>
+      <field name="domain">[('origem', '!=', False), ('gravidade', '!=', False)]</field>
+      <field name="search_view_id" ref="view_qualidade_dashboard_search"/>
+      <field name="context">{'pivot_measures': ['quantidade']}</field>
+    </record>
+
+    <record id="action_qualidade_dashboard_responsavel" model="ir.actions.act_window">
+      <field name="name">Responsável e Tempo de Fecho</field>
+      <field name="res_model">qualidade.reclamacao.dashboard</field>
+      <field name="view_mode">pivot,graph,list</field>
+      <field name="view_id" ref="view_qualidade_dashboard_resolucao_pivot"/>
+      <field name="search_view_id" ref="view_qualidade_dashboard_search"/>
+      <field name="context">{'search_default_group_responsavel': 1}</field>
+    </record>
+
+    <record id="action_qualidade_dashboard_tempo_fecho" model="ir.actions.act_window">
+      <field name="name">Tempo de Fecho</field>
+      <field name="res_model">qualidade.reclamacao.dashboard</field>
+      <field name="view_mode">graph,pivot,list</field>
+      <field name="view_id" ref="view_qualidade_dashboard_tempo_fecho_graph"/>
+      <field name="domain">[('estado_resposta', '=', 'fechado'), ('dias_para_fechar', '!=', False), ('gravidade', '!=', False)]</field>
+      <field name="search_view_id" ref="view_qualidade_dashboard_search"/>
+      <field name="context">{'search_default_group_gravidade': 1}</field>
+    </record>
+
+    <record id="action_qualidade_dashboard_sla" model="ir.actions.act_window">
+      <field name="name">SLA em Atraso</field>
+      <field name="res_model">qualidade.reclamacao.dashboard</field>
+      <field name="view_mode">list,pivot,graph</field>
+      <field name="domain">[('estado_resposta', '!=', 'fechado'), ('fora_sla_7', '=', True)]</field>
+      <field name="search_view_id" ref="view_qualidade_dashboard_search"/>
+      <field name="context">{'search_default_group_estado': 1}</field>
+    </record>
+
+    <record id="action_qualidade_dashboard_acoes_pendentes" model="ir.actions.act_window">
+      <field name="name">Ações Corretivas Pendentes</field>
+      <field name="res_model">qualidade.reclamacao.dashboard</field>
+      <field name="view_mode">list,pivot,graph</field>
+      <field name="domain">[('acoes_corretivas_pendentes', '=', True)]</field>
+      <field name="search_view_id" ref="view_qualidade_dashboard_search"/>
+      <field name="context">{'search_default_group_responsavel': 1}</field>
+    </record>
+  </data>
+</odoo>

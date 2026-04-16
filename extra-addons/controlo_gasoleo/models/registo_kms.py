@@ -1,5 +1,16 @@
+from datetime import timedelta
+from html import escape
+
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
+
+
+RELATORIO_MENSAL_EMAILS = [
+    'ricardo.nunes@mirazeite.com',
+    'goncalo.simoes@mirazeite.com',
+    'filomena.furtado@mirazeite.com',
+]
+
 
 class RegistoKms(models.Model):
     _name = 'gasoleo.registo.kms'
@@ -70,3 +81,110 @@ class RegistoKms(models.Model):
         for rec in self:
             rec._deposito_adicionar(rec.deposito_id, rec.litros or 0.0)
         return super().unlink()
+
+    @api.model
+    def _get_periodo_relatorio_mensal(self, data_referencia=None):
+        data_referencia = data_referencia or fields.Date.context_today(self)
+        if isinstance(data_referencia, str):
+            data_referencia = fields.Date.from_string(data_referencia)
+        inicio = data_referencia.replace(day=1)
+        fim = data_referencia + timedelta(days=1)
+        return inicio, fim
+
+    @api.model
+    def _format_litros(self, litros):
+        return f'{litros or 0.0:,.2f}'.replace(',', ' ').replace('.', ',')
+
+    @api.model
+    def _read_group_litros(self, domain, groupby_field):
+        rows = self.sudo().read_group(
+            domain,
+            ['litros:sum'],
+            [groupby_field],
+            orderby=f'{groupby_field} asc',
+            lazy=False,
+        )
+        result = []
+        for row in rows:
+            group_value = row.get(groupby_field)
+            nome = group_value[1] if group_value else 'Sem valor'
+            result.append({
+                'nome': nome,
+                'litros': row.get('litros') or 0.0,
+            })
+        return result
+
+    @api.model
+    def _render_tabela_relatorio_mensal(self, titulo, rows):
+        if not rows:
+            return f'''
+                <h3>{escape(titulo)}</h3>
+                <p>Sem registos no período.</p>
+            '''
+
+        linhas = ''.join(
+            f'''
+                <tr>
+                    <td style="padding:6px 8px;border-bottom:1px solid #ddd;">{escape(row['nome'])}</td>
+                    <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right;">{self._format_litros(row['litros'])}</td>
+                </tr>
+            '''
+            for row in rows
+        )
+        return f'''
+            <h3>{escape(titulo)}</h3>
+            <table style="border-collapse:collapse;width:100%;max-width:720px;">
+                <thead>
+                    <tr>
+                        <th style="padding:6px 8px;border-bottom:2px solid #999;text-align:left;">Nome</th>
+                        <th style="padding:6px 8px;border-bottom:2px solid #999;text-align:right;">Litros</th>
+                    </tr>
+                </thead>
+                <tbody>{linhas}</tbody>
+            </table>
+        '''
+
+    @api.model
+    def _get_body_relatorio_mensal(self, inicio, fim):
+        domain = [
+            ('data', '>=', inicio),
+            ('data', '<', fim),
+        ]
+        total_litros = sum(self.sudo().search(domain).mapped('litros'))
+        periodo = f'{inicio.strftime("%d/%m/%Y")} a {(fim - timedelta(days=1)).strftime("%d/%m/%Y")}'
+
+        tabelas = [
+            self._render_tabela_relatorio_mensal(
+                'Total de litros por Condutor',
+                self._read_group_litros(domain, 'condutor_id'),
+            ),
+            self._render_tabela_relatorio_mensal(
+                'Total de litros por Veículo',
+                self._read_group_litros(domain, 'veiculo_id'),
+            ),
+            self._render_tabela_relatorio_mensal(
+                'Total de litros por Depósito',
+                self._read_group_litros(domain, 'deposito_id'),
+            ),
+        ]
+
+        return f'''
+            <p>Segue o relatório mensal de gasóleo referente ao período <strong>{escape(periodo)}</strong>.</p>
+            <p><strong>Total mensal:</strong> {self._format_litros(total_litros)} litros</p>
+            {''.join(tabelas)}
+        '''
+
+    @api.model
+    def _cron_enviar_relatorio_mensal_gasoleo(self):
+        inicio, fim = self._get_periodo_relatorio_mensal()
+        body = self._get_body_relatorio_mensal(inicio, fim)
+        periodo = f'{inicio.strftime("%d/%m/%Y")} a {(fim - timedelta(days=1)).strftime("%d/%m/%Y")}'
+
+        mail = self.env['mail.mail'].sudo().create({
+            'subject': f'Relatório Mensal de Gasóleo - {periodo}',
+            'email_from': 'noreply@mirazeite.com',
+            'email_to': ','.join(RELATORIO_MENSAL_EMAILS),
+            'body_html': body,
+        })
+        mail.sudo().send()
+        return True

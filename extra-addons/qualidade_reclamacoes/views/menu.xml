@@ -1,6 +1,51 @@
 <odoo>
   <data>
     <menuitem id="menu_qualidade_root" name="Qualidade" sequence="20" groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_dashboard" name="Dashboard"
+              parent="menu_qualidade_root" sequence="5"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_dashboard_indicadores" name="Indicadores"
+              parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_kpi" sequence="1"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_dashboard_geral" name="Visão Geral"
+              parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard" sequence="5"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_dashboard_tipo" name="Cliente vs Fornecedor"
+              parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard_tipo" sequence="10"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_dashboard_clientes" name="Clientes"
+              parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard_clientes" sequence="20"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_dashboard_fornecedores" name="Fornecedores"
+              parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard_fornecedores" sequence="30"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_dashboard_categoria" name="Categoria"
+              parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard_categoria" sequence="40"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_dashboard_origem" name="Origem"
+              parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard_origem" sequence="50"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_dashboard_gravidade" name="Gravidade"
+              parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard_gravidade" sequence="60"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_dashboard_categoria_gravidade" name="Categoria x Gravidade"
+              parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard_categoria_gravidade" sequence="70"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_dashboard_origem_gravidade" name="Origem x Gravidade"
+              parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard_origem_gravidade" sequence="80"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_dashboard_responsavel" name="Responsável e Fecho"
+              parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard_responsavel" sequence="90"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_dashboard_tempo_fecho" name="Tempo de Fecho"
+              parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard_tempo_fecho" sequence="100"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_dashboard_sla" name="SLA em Atraso"
+              parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard_sla" sequence="110"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_dashboard_acoes_pendentes" name="Ações Pendentes"
+              parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard_acoes_pendentes" sequence="120"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
     <menuitem id="menu_qualidade_clientes" name="Reclamações Clientes"
               parent="menu_qualidade_root" action="qualidade_reclamacoes.action_qualidade_cliente" sequence="10"
               groups="qualidade_reclamacoes.group_qualidade_eng"/>
