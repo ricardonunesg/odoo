@@ -15,4 +15,9 @@
         "views/tarefas_menu.xml",
         "views/tarefas_template_views.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            "tarefas/static/src/js/subtask_kanban_list_patch.js",
+        ],
+    },
 }

@@ -29,4 +29,25 @@
       </field>
     </field>
   </record>
+
+  <record id="view_project_task_todo_kanban_subtasks" model="ir.ui.view">
+    <field name="name">project.task.todo.kanban.subtasks</field>
+    <field name="model">project.task</field>
+    <field name="inherit_id" ref="project_todo.project_task_view_todo_kanban"/>
+    <field name="arch" type="xml">
+      <field name="state" position="after">
+        <field name="project_id"/>
+        <field name="subtask_count"/>
+        <field name="closed_subtask_count"/>
+      </field>
+      <field name="activity_ids" position="after">
+        <t t-if="record.subtask_count.raw_value">
+          <widget name="subtask_counter" class="ms-1"/>
+        </t>
+      </field>
+      <xpath expr="//templates/t[@t-name='card']" position="inside">
+        <widget name="subtask_kanban_list"/>
+      </xpath>
+    </field>
+  </record>
 </odoo>
