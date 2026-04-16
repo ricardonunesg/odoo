@@ -1,7 +1,7 @@
 {
     "name": "Tarefas (Templates + Agenda) - Odoo 18",
     "version": "18.0.1.0.0",
-    "depends": ["project"],
+    "depends": ["project", "project_todo"],
     "installable": True,
     "application": True,
     "data": [
@@ -11,6 +11,7 @@
         "security/security.xml",
         "security/ir.model.access.csv",
         "data/cron.xml",
+        "views/project_todo_views.xml",
         "views/tarefas_menu.xml",
         "views/tarefas_template_views.xml",
     ],
