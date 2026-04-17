@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_primavera_connection_list" model="ir.ui.view">
+        <field name="name">primavera.connection.list</field>
+        <field name="model">primavera.connection</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="server"/>
+                <field name="instance"/>
+                <field name="port"/>
+                <field name="database"/>
+                <field name="username"/>
+                <field name="last_connection_test"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_primavera_connection_form" model="ir.ui.view">
+        <field name="name">primavera.connection.form</field>
+        <field name="model">primavera.connection</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_test_connection" type="object" string="Testar ligacao" class="btn-primary"/>
+                    <button name="action_import_customers" type="object" string="Importar clientes"/>
+                    <button name="action_import_suppliers" type="object" string="Importar fornecedores"/>
+                    <button name="action_import_products" type="object" string="Importar artigos"/>
+                    <button name="action_sync_all" type="object" string="Sincronizar tudo" class="btn-secondary"/>
+                    <button name="action_tag_existing_crm_contacts" type="object" string="Marcar contactos CRM"/>
+                    <button name="action_tag_odoo_user_contacts" type="object" string="Marcar utilizadores Odoo"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="active"/>
+                            <field name="server"/>
+                            <field name="instance"/>
+                            <field name="port"/>
+                            <field name="database"/>
+                            <field name="sync_customers"/>
+                            <field name="sync_suppliers"/>
+                            <field name="sync_products"/>
+                        </group>
+                        <group>
+                            <field name="username"/>
+                            <field name="password" password="True"/>
+                            <field name="tds_version"/>
+                            <field name="trust_server_certificate"/>
+                        </group>
+                    </group>
+                    <group string="Ultimo teste">
+                        <field name="last_connection_test" readonly="1"/>
+                        <field name="last_connection_message" readonly="1"/>
+                    </group>
+                    <group string="Ultima sincronizacao">
+                        <field name="last_sync_date" readonly="1"/>
+                        <field name="last_sync_message" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_primavera_connection" model="ir.actions.act_window">
+        <field name="name">Ligacoes Primavera</field>
+        <field name="res_model">primavera.connection</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

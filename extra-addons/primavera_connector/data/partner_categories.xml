@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="partner_category_primavera_customer" model="res.partner.category">
+        <field name="name">Primavera / Cliente</field>
+        <field name="color">2</field>
+    </record>
+
+    <record id="partner_category_primavera_supplier" model="res.partner.category">
+        <field name="name">Primavera / Fornecedor</field>
+        <field name="color">4</field>
+    </record>
+
+    <record id="partner_category_crm_prospect" model="res.partner.category">
+        <field name="name">CRM / Potencial</field>
+        <field name="color">3</field>
+    </record>
+
+    <record id="partner_category_odoo_user" model="res.partner.category">
+        <field name="name">Odoo / Utilizador</field>
+        <field name="color">1</field>
+    </record>
+</odoo>

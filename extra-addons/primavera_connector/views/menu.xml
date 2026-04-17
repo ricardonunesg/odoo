@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_primavera_root" name="Primavera" sequence="80" groups="base.group_system"/>
+    <menuitem id="menu_primavera_config" name="Configuracao" parent="menu_primavera_root" sequence="10"/>
+    <menuitem id="menu_primavera_connections" name="Ligacoes" parent="menu_primavera_config" action="action_primavera_connection" sequence="10"/>
+    <menuitem id="menu_primavera_logs" name="Logs" parent="menu_primavera_root" action="action_primavera_sync_log" sequence="90"/>
+</odoo>

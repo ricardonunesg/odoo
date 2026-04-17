@@ -1,0 +1,21 @@
+{
+    "name": "Primavera Connector",
+    "version": "18.0.1.0.0",
+    "summary": "Integra clientes, fornecedores e artigos do Primavera",
+    "category": "Tools",
+    "author": "Mirazeite",
+    "depends": ["base", "product", "contacts"],
+    "data": [
+        "security/security.xml",
+        "security/ir.model.access.csv",
+        "data/partner_categories.xml",
+        "data/cron.xml",
+        "views/primavera_connection_views.xml",
+        "views/primavera_sync_log_views.xml",
+        "views/res_partner_views.xml",
+        "views/product_template_views.xml",
+        "views/menu.xml",
+    ],
+    "application": True,
+    "license": "LGPL-3",
+}

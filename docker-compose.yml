@@ -11,7 +11,8 @@ services:
     restart: unless-stopped
 
   odoo:
-    image: odoo:18.0
+    build: .
+    image: odoo18-primavera:18.0
     container_name: odoo18_app
     depends_on:
       - db
