@@ -1,8 +1,9 @@
 {
     "name": "Mirazeite — NIF obrigatório e dedup Primavera",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.1.0",
     "summary": (
-        "Força NIF em novos contactos-empresa, faz merge automático "
+        "Força NIF em novos contactos-empresa e contactos individuais sem "
+        "empresa, faz merge automático "
         "quando Primavera empurra um cliente/fornecedor com NIF já "
         "existente em Odoo, e limpa emails partilhados nos partners."
     ),

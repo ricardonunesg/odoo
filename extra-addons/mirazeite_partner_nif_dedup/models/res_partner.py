@@ -7,6 +7,10 @@ _logger = logging.getLogger(__name__)
 
 INSTALL_DATE_PARAM = "mirazeite_partner_nif_dedup.install_date"
 
+# Flag de contexto para partners criados automaticamente (emails, users):
+# ficam isentos da obrigatoriedade de NIF.
+AUTO_CONTACT_CTX = "nif_dedup_auto_contact"
+
 WATCHED_MERGE_VATS = {
     "B10325280": {
         "label": "ZORZALIA SL",
@@ -88,6 +92,23 @@ class ResPartner(models.Model):
 
         return self.browse([r.id for r in results])
 
+    # ────────────────────────────────────────────────────────────────
+    # Criação automática a partir de emails: isenta de NIF
+    # ────────────────────────────────────────────────────────────────
+    @api.model
+    def find_or_create(self, email, assert_valid_email=False):
+        return super(
+            ResPartner, self.with_context(**{AUTO_CONTACT_CTX: True})
+        ).find_or_create(email, assert_valid_email=assert_valid_email)
+
+    @api.model
+    def _find_or_create_from_emails(self, emails, additional_values=None):
+        return super(
+            ResPartner, self.with_context(**{AUTO_CONTACT_CTX: True})
+        )._find_or_create_from_emails(
+            emails, additional_values=additional_values
+        )
+
     def _maybe_alert_watched_merge(self, partner, vat_norm, prim_code):
         """Dispara email one-shot quando um NIF em WATCHED_MERGE_VATS
         acabou de ter merge. Usa ir.config_parameter como flag para não
@@ -161,9 +182,14 @@ class ResPartner(models.Model):
             return
         install_date = fields.Datetime.from_string(install_date_str)
 
+        # Processos de sistema (sync Primavera, cron, mail gateway) e
+        # criações automáticas (emails, users) ficam isentos.
+        if self.env.su or self.env.context.get(AUTO_CONTACT_CTX):
+            return
+
         for partner in self:
-            if not partner.is_company:
-                continue
+            if not partner.is_company and partner.parent_id:
+                continue  # contacto de uma empresa (que já exige NIF)
             if not partner.create_date or partner.create_date < install_date:
                 continue
             if (
@@ -173,7 +199,23 @@ class ResPartner(models.Model):
                 continue
             if partner.vat:
                 continue
+            if partner.user_ids:
+                continue  # ficha de utilizador interno/portal
 
+            if not partner.is_company:
+                raise ValidationError(
+                    _(
+                        "Não é possível criar o contacto individual "
+                        "%(name)s sem empresa e sem NIF.\n\n"
+                        "Escolhe uma destas opções:\n"
+                        "• Liga o contacto a uma empresa (campo 'Empresa'), "
+                        "que tem de ter NIF; ou\n"
+                        "• Preenche o NIF do contacto.\n\n"
+                        "Contactos individuais soltos nunca coincidem com os "
+                        "clientes do Primavera e geram duplicados."
+                    )
+                    % {"name": partner.name or _("(sem nome)")}
+                )
             raise ValidationError(
                 _(
                     "É obrigatório preencher o NIF no contacto %(name)s.\n\n"
