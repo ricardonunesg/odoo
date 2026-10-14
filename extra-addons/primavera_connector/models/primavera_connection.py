@@ -535,6 +535,30 @@ class PrimaveraConnection(models.Model):
         self._ecl_post_change(so, body)
         self._log("ecls", "success", f"[notificação] {so.primavera_ecl_ref}: {len(diffs)} alteração(ões): " + "; ".join(diffs)[:400])
 
+    def _ecl_notify_new(self, so):
+        """Notificação de ECL nova (acrescentada à fase 1 a 14/10/2026)."""
+        linhas = so.order_line.filtered(lambda l: l.product_id and not l.display_type)
+        detalhe = "".join(
+            f"<li>{html.escape(l.product_id.default_code or l.product_id.display_name)} — "
+            f"{self._fmt_num(l.product_uom_qty)}</li>"
+            for l in linhas[:15]
+        )
+        if len(linhas) > 15:
+            detalhe += f"<li>… e mais {len(linhas) - 15} linha(s)</li>"
+        extra = []
+        if so.ecl_pais_destino_id:
+            extra.append(f"País de destino: {html.escape(so.ecl_pais_destino_id.name)}")
+        if so.ecl_incoterm:
+            extra.append(f"Incoterm: {html.escape(so.ecl_incoterm)} {html.escape(so.ecl_incoterm_local or '')}".strip())
+        body = (
+            f"<p><b>Nova ECL no Primavera</b>: {html.escape(so.primavera_ecl_ref or so.name)} — "
+            f"{html.escape(so.partner_id.name or '')}</p>"
+            + (f"<p>{' · '.join(extra)}</p>" if extra else "")
+            + (f"<ul>{detalhe}</ul>" if detalhe else "")
+        )
+        self._ecl_post_change(so, body)
+        self._log("ecls", "success", f"[notificação] {so.primavera_ecl_ref}: nova ECL ({so.partner_id.name or ''})")
+
     @api.model
     def _cron_fim_fase1_notificacoes_ecl(self):
         """Notificação única no fim da fase 1 (21/10/2026): resumo da semana e
@@ -545,15 +569,16 @@ class PrimaveraConnection(models.Model):
                            ("create_date", ">=", desde)])
         anul = len(logs.filtered(lambda l: "anulada no Primavera" in l.message))
         react = len(logs.filtered(lambda l: "anulação desfeita" in l.message))
-        alter = len(logs) - anul - react
+        novas = len(logs.filtered(lambda l: ": nova ECL" in l.message))
+        alter = len(logs) - anul - react - novas
         dias = defaultdict(int)
         for l in logs:
             dias[fields.Date.to_string(l.create_date.date())] += 1
         por_dia = "".join(f"<li>{d}: {n}</li>" for d, n in sorted(dias.items())) or "<li>(nenhuma)</li>"
         body = (
             "<p><b>Fim da fase 1 das notificações de alterações de ECL.</b></p>"
-            f"<p>Na última semana recebeste <b>{len(logs)}</b> notificações: {alter} de alterações, "
-            f"{anul} de anulações e {react} de anulações desfeitas.</p>"
+            f"<p>Na última semana recebeste <b>{len(logs)}</b> notificações: {novas} de ECLs novas, "
+            f"{alter} de alterações, {anul} de anulações e {react} de anulações desfeitas.</p>"
             f"<p>Por dia:</p><ul>{por_dia}</ul>"
             "<p>Está na altura de decidirmos a fase 2: quem passa a receber estas notificações e se "
             "mudamos algum tipo. Fala com o Claude para combinarmos.</p>"
@@ -1657,7 +1682,9 @@ class PrimaveraConnection(models.Model):
                     }))
                 so_vals["ecl_doc_line_ids"] = doc_lines
 
-            return SO.create(so_vals)
+            new_so = SO.create(so_vals)
+            self._ecl_notify_new(new_so)
+            return new_so
 
     def _partner_vals_from_api(self, data, partner_type, code_field, rank_field, category):
         """Mapeia campos API Primavera → vals Odoo."""
