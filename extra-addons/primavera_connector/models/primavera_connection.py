@@ -464,6 +464,8 @@ class PrimaveraConnection(models.Model):
         message_post: os seguidores das encomendas estão inscritos nas notas
         internas e seriam todos avisados."""
         so._message_log(body=Markup(body_html))
+        if self.env.context.get("ecl_verificacao"):
+            return  # correcção da verificação diária: já vai no relatório
         partners = self._ecl_notify_partners()
         if partners:
             so.message_notify(
@@ -752,6 +754,13 @@ class PrimaveraConnection(models.Model):
             ICP.set_param(k_full, fields.Datetime.to_string(now))
             if new_ver:
                 ICP.set_param(k_ver, new_ver)
+            # Verificação diária Odoo ↔ Primavera, logo a seguir à volta completa
+            # (só na volta diária com SQL a funcionar; sem cron próprio).
+            if full_due and sql_ok:
+                try:
+                    self._verify_ecls()
+                except Exception as exc:
+                    self._log("ecls", "error", _("[verificação] Erro: %s") % exc)
             return
 
         refs, new_ver = changed
@@ -856,6 +865,157 @@ class PrimaveraConnection(models.Model):
             except Exception as exc:
                 self._log("connection", "error", f"Envio de email falhou: {exc}")
                 self.env.cr.commit()
+
+    # ── Verificação diária ECLs Odoo ↔ Primavera (ponto 6, 14/10/2026) ──
+    # Corre logo a seguir à volta completa diária. Compara (só leitura no
+    # Primavera) as ECLs das séries do ano corrente e anterior: em falta no
+    # Odoo → importa (para 'Fechado' se fechada no Primavera); anulada não
+    # reflectida → anula; em curso diferente → re-sincroniza; 'Fechado'
+    # diferente ou só no Odoo → só reporta. Notifica os destinatários das
+    # notificações de ECL só quando há alguma coisa.
+
+    def _verify_ecls_primavera(self):
+        hoje = fields.Date.context_today(self)
+        # Série do ano corrente sempre; a do ano anterior só se o Odoo já tiver
+        # ECLs dela (o Odoo começou em 2026 — não importar o histórico de 2025).
+        anterior = str(hoje.year - 1)
+        tem_anterior = self.env["sale.order"].sudo().search_count(
+            [("primavera_ecl_ref", "like", f"ECL/{anterior}/%")], limit=1)
+        series = (str(hoje.year), anterior if tem_anterior else str(hoje.year))
+        prim = {}
+        sql_conn = self._sql_connection()
+        if not sql_conn:
+            raise UserError(_("sem ligação ao SQL Server"))
+        try:
+            with sql_conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 'ECL/' + c.Serie + '/' + CAST(c.NumDoc AS varchar), ISNULL(s.Anulado,0), ISNULL(s.Fechado,0), "
+                    "c.Nome, c.CDU_Incoterm, c.CDU_IncotermLocal, c.CDU_transitario, c.CDU_Pais, c.Data "
+                    "FROM CabecDoc c LEFT JOIN CabecDocStatus s ON s.IdCabecDoc = c.Id "
+                    "WHERE c.TipoDoc = 'ECL' AND c.Serie IN (%s, %s)", series)
+                for ref, anul, fech, nome, inc, loc, tr, pais, data in cur.fetchall():
+                    prim[ref] = {
+                        "anulada": bool(anul), "fechada": bool(fech), "nome": nome or "", "linhas": {}, "data": data,
+                        "cab": {"incoterm": (inc or "").strip(), "local": (loc or "").strip(),
+                                "transitário": (tr or "").strip(), "país": (pais or "").strip()},
+                    }
+                cur.execute(
+                    "SELECT 'ECL/' + c.Serie + '/' + CAST(c.NumDoc AS varchar), l.Artigo, l.Quantidade, l.PrecUnit "
+                    "FROM CabecDoc c JOIN LinhasDoc l ON l.IdCabecDoc = c.Id "
+                    "WHERE c.TipoDoc = 'ECL' AND c.Serie IN (%s, %s) AND l.Artigo IS NOT NULL AND l.Artigo <> ''", series)
+                for ref, art, q, p in cur.fetchall():
+                    d = prim[ref]["linhas"].setdefault(art, [0.0, set()])
+                    d[0] += float(q or 0)
+                    d[1].add(round(float(p or 0), 2))
+        finally:
+            sql_conn.close()
+        return prim, series
+
+    def _verify_ecl_diffs(self, so, p):
+        ol = {}
+        for l in so.order_line:
+            if l.product_id and not l.display_type:
+                d = ol.setdefault(l.product_id.default_code, [0.0, set()])
+                d[0] += l.product_uom_qty
+                d[1].add(round(l.price_unit, 2))
+        dif = []
+        for k in sorted(set(ol) | set(p["linhas"])):
+            a, b = p["linhas"].get(k), ol.get(k)
+            if not a or not b:
+                dif.append(f"artigo {k} só no {'Odoo' if b else 'Primavera'}")
+            elif abs(a[0] - b[0]) > 0.001:
+                dif.append(f"{k}: quantidade Primavera {self._fmt_num(a[0])} / Odoo {self._fmt_num(b[0])}")
+            elif a[1] != b[1]:
+                dif.append(f"{k}: preço diferente")
+        cab_o = {"incoterm": so.ecl_incoterm or "", "local": so.ecl_incoterm_local or "",
+                 "transitário": so.ecl_transitario or "", "país": so.ecl_pais_destino_id.code or ""}
+        for k, v in p["cab"].items():
+            if (v or "") != (cab_o[k] or "") and not (k == "país" and v and not cab_o[k]):
+                dif.append(f"{k}: Primavera \"{v}\" / Odoo \"{cab_o[k]}\"")
+        return dif
+
+    def _verify_ecls(self):
+        self.ensure_one()
+        prim, series = self._verify_ecls_primavera()
+        SO = self.env["sale.order"].sudo().with_context(active_test=False)
+        odoo = {so.primavera_ecl_ref: so for so in SO.search([("primavera_ecl_ref", "like", "ECL/%")])}
+        ignorar = {
+            x.strip() for x in (self.env["ir.config_parameter"].sudo()
+                                .get_param("primavera_connector.ecl_anulacao_ignorar") or "").split(",") if x.strip()
+        }
+        fechado = self.env.ref("documentos.stage_ecl_closed", raise_if_not_found=False)
+        anulada_stage = self.env.ref("primavera_connector.stage_ecl_anulada", raise_if_not_found=False)
+        me = self.with_context(ecl_verificacao=True)
+        corrigido, atencao = [], []
+
+        for ref, p in sorted(prim.items()):
+            so = odoo.get(ref)
+            if ref in ignorar:
+                continue
+            if not so:
+                if p["anulada"]:
+                    continue
+                novo = me._resync_single_ecl(ref)
+                if not novo:
+                    atencao.append(f"{ref} — {p['nome']}: falta no Odoo e não foi possível importar (cliente em falta?)")
+                    continue
+                if p["data"] and (not novo.date_order or novo.date_order.date() != p["data"].date()):
+                    novo.date_order = p["data"]
+                destino = ""
+                if p["fechada"] and fechado:
+                    novo.stage_id = fechado
+                    destino = " para \"Fechado\""
+                corrigido.append(f"{ref} — {p['nome']}: faltava no Odoo; importada{destino}")
+                continue
+            if p["anulada"]:
+                if so.state != "cancel":
+                    me._resync_single_ecl(ref)
+                    corrigido.append(f"{ref} — {p['nome']}: anulada no Primavera; anulada no Odoo")
+                continue
+            dif = self._verify_ecl_diffs(so, p)
+            if not dif:
+                continue
+            em_fechado = so.stage_id.fold and so.stage_id != anulada_stage
+            if em_fechado:
+                atencao.append(f"{ref} — {p['nome']} (em \"Fechado\", não alterada): " + "; ".join(dif[:3]))
+                continue
+            me._resync_single_ecl(ref)
+            so.invalidate_recordset()
+            dif2 = self._verify_ecl_diffs(so, p)
+            if dif2:
+                atencao.append(f"{ref} — {p['nome']}: continua diferente após re-sincronizar: " + "; ".join(dif2[:3]))
+            else:
+                corrigido.append(f"{ref} — {p['nome']}: estava diferente ({'; '.join(dif[:2])}); corrigida")
+
+        for ref, so in sorted(odoo.items()):
+            if ref.split("/")[1] in series and ref not in prim:
+                atencao.append(f"{ref}: existe no Odoo mas não no Primavera")
+
+        resumo = _("[verificação] %s ECL(s) comparadas; %s corrigida(s); %s a precisar de atenção.") % (
+            len(prim), len(corrigido), len(atencao))
+        self._log("ecls", "success" if not atencao else "error", resumo + (" " + " | ".join(atencao))[:900] if atencao else resumo)
+        # Avisos "a precisar de atenção" só são notificados uma vez (até mudarem)
+        ICP = self.env["ir.config_parameter"].sudo()
+        k_rep = f"primavera_connector.ecl_verif_reportados.{self.id}"
+        ja = set(filter(None, (ICP.get_param(k_rep) or "").split("\n")))
+        ICP.set_param(k_rep, "\n".join(sorted(atencao)) or False)
+        atencao = [a for a in atencao if a not in ja]
+        if not (corrigido or atencao):
+            return
+        quando = fields.Datetime.context_timestamp(
+            self.with_context(tz="Europe/Lisbon"), fields.Datetime.now()).strftime("%d/%m/%Y %H:%M")
+        body = f"<p><b>Verificação diária das ECLs</b> ({quando}) — {len(prim)} comparadas com o Primavera.</p>"
+        if corrigido:
+            body += "<p>Corrigido automaticamente:</p><ul>" + "".join(f"<li>{html.escape(x)}</li>" for x in corrigido) + "</ul>"
+        if atencao:
+            body += "<p><b>Precisa de atenção:</b></p><ul>" + "".join(f"<li>{html.escape(x)}</li>" for x in atencao) + "</ul>"
+        partners = self._ecl_notify_partners()
+        if partners:
+            partners[:1].message_notify(
+                partner_ids=partners.ids,
+                subject=f"Verificação das ECLs: {len(corrigido)} corrigida(s), {len(atencao)} a ver",
+                body=Markup(body),
+            )
 
     @api.model
     def cron_resync_ecls_ano_corrente(self):
