@@ -398,9 +398,6 @@ class PrimaveraConnection(models.Model):
         finally:
             sql_conn.close()
 
-    def _ecl_export_records(self, so):
-        return self.env["export.ecl"].sudo().search([("name", "=", so.primavera_ecl_ref)])
-
     def _apply_ecl_anulada(self, so):
         """Cancela a SO e põe-na (e o export.ecl) na etapa 'Anulada'.
         ECLs listadas em primavera_connector.ecl_anulacao_ignorar ficam como estão."""
@@ -423,7 +420,6 @@ class PrimaveraConnection(models.Model):
         if so.state != "cancel":
             so.with_context(disable_cancel_warning=True).action_cancel()
         so.stage_id = stage
-        self._ecl_export_records(so).write({"stage_id": stage.id})
         info = self._ecl_anulacao_info(so.primavera_ecl_ref)
         if info:
             data_anul, utilizador, motivo, descricao = info
@@ -447,7 +443,6 @@ class PrimaveraConnection(models.Model):
         new_stage = self.env.ref("documentos.stage_ecl_new", raise_if_not_found=False)
         if new_stage:
             so.stage_id = new_stage
-            self._ecl_export_records(so).write({"stage_id": new_stage.id})
         so.message_post(body=_("Anulação desfeita no Primavera — ECL reactivada."))
         self._log("ecls", "success", _("%s: anulação desfeita no Primavera, ECL reactivada.") % so.primavera_ecl_ref)
 
@@ -1418,7 +1413,7 @@ class PrimaveraConnection(models.Model):
         return stats
 
     def _import_ecls_serie(self, serie=None, last_num=None):
-        """Varre ECLs por número sequencial e importa para export.ecl.
+        """Varre ECLs por número sequencial e importa-as como sale.order.
         Sem argumentos usa a série/contador configurados (e grava o contador);
         com `serie`/`last_num` (série anterior) devolve o último nº em stats['_last']."""
         self.ensure_one()
@@ -1428,7 +1423,7 @@ class PrimaveraConnection(models.Model):
             return {"created": 0, "updated": 0, "skipped": 0, **({} if current else {"_last": last_num or 0})}
 
         stats = {"created": 0, "updated": 0, "skipped": 0}
-        EclModel = self.env["export.ecl"].sudo()
+        SO = self.env["sale.order"].sudo()
         Partner = self.env["res.partner"].sudo().with_context(active_test=False)
 
         if current:
@@ -1463,8 +1458,10 @@ class PrimaveraConnection(models.Model):
             ecl_name = f"ECL/{serie}/{num}"
             entidade = data["Entidade"]
 
+            existing_so = SO.search_count([("primavera_ecl_ref", "=", ecl_name)])
+
             # ECL que já chega anulada e ainda não existe no Odoo: não criar
-            if data.get("Anulado") and not EclModel.search_count([("name", "=", ecl_name)]):
+            if data.get("Anulado") and not existing_so:
                 stats["skipped"] += 1
                 continue
 
@@ -1486,10 +1483,11 @@ class PrimaveraConnection(models.Model):
                         # Parceiro existe mas sem ref (importado por versão anterior) — actualizar
                         self._safe_write_partner(partner, {"ref": entidade})
 
-            ecl = EclModel.search([("name", "=", ecl_name)], limit=1)
-            date_raw = data.get("Data") or data.get("DataDoc")
-            date_val = self._parse_date(date_raw)
+            if not partner:
+                stats["skipped"] += 1
+                continue
 
+            date_val = self._parse_date(data.get("Data") or data.get("DataDoc"))
             campos = {
                 cu["Nome"]: cu.get("Valor")
                 for cu in data.get("CamposUtil", [])
@@ -1501,45 +1499,17 @@ class PrimaveraConnection(models.Model):
             pais_id = self._country_id(pais_code) if pais_code else False
             transitario_val = self._clean(campos.get("CDU_transitario"))
 
-            ecl_vals = {
-                "name": ecl_name,
-                "partner_id": partner.id if partner else False,
-                "date_order": date_val,
-                "incoterm": incoterm_val,
-                "incoterm_local": incoterm_local_val,
-                "pais_destino_id": pais_id,
-                "transitario": transitario_val,
-            }
-            ecl_vals = {k: v for k, v in ecl_vals.items() if v not in (None, False)}
-
-            if not ecl_vals.get("partner_id"):
-                stats["skipped"] += 1
-                continue
-
-            # ── Purchase Order ─────────────────────────────────────────────
-            po = self._sync_ecl_sale_order(
+            # A ECL no Odoo é a sale.order (kanban do Documentos); o antigo
+            # registo export.ecl deixou de ser criado (14/10/2026).
+            so = self._sync_ecl_sale_order(
                 ecl_name, partner, date_val, data,
                 incoterm_val, incoterm_local_val, pais_id, transitario_val,
             )
-            if po:
-                ecl_vals["sale_order_id"] = po.id
-
-            if ecl:
-                ecl.write(ecl_vals)
+            if not so:
+                stats["skipped"] += 1
+            elif existing_so:
                 stats["updated"] += 1
             else:
-                # Stage "Estado Novo" para ECLs novas
-                if "stage_id" not in ecl_vals:
-                    stage = self.env["export.ecl.stage"].search(
-                        [], order="sequence", limit=1
-                    )
-                    if stage:
-                        ecl_vals["stage_id"] = stage.id
-
-                # As linhas de documentos são criadas em _sync_ecl_sale_order via sale_order_id
-                # (não replicar aqui — evita duplicação por causa do init() que copia ecl_id→sale_order_id)
-
-                EclModel.create(ecl_vals)
                 stats["created"] += 1
 
         if not current:
