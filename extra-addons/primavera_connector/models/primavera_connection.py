@@ -351,6 +351,105 @@ class PrimaveraConnection(models.Model):
         self.ecl_last_imported_num = 0
         return self._notify(_("ECL"), _("Contador reiniciado. Próxima sincronização reimporta todas."))
 
+    # ─────────────────────────────────────────────────────────────────────
+    # ECLs ANULADAS NO PRIMAVERA
+    # ─────────────────────────────────────────────────────────────────────
+
+    def _get_ecl_stage_anulada(self):
+        """Etapa 'Anulada' do kanban de ECLs; criada na primeira utilização."""
+        stage = self.env.ref("primavera_connector.stage_ecl_anulada", raise_if_not_found=False)
+        if stage:
+            return stage
+        Stage = self.env["export.ecl.stage"].sudo()
+        last = Stage.search([], order="sequence desc", limit=1)
+        stage = Stage.create({
+            "name": "Anulada",
+            "sequence": (last.sequence or 50) + 10,
+            "fold": True,
+        })
+        self.env["ir.model.data"].sudo().create({
+            "module": "primavera_connector",
+            "name": "stage_ecl_anulada",
+            "model": "export.ecl.stage",
+            "res_id": stage.id,
+            "noupdate": True,
+        })
+        return stage
+
+    def _ecl_anulacao_info(self, ecl_name):
+        """(data, utilizador, código, descrição) da anulação no Primavera, ou None."""
+        _prefix, serie, num = ecl_name.split("/")
+        sql_conn = self._sql_connection()
+        if not sql_conn:
+            return None
+        try:
+            with sql_conn.cursor() as cur:
+                cur.execute(
+                    "SELECT s.DataAnulacao, s.UtilizadorAnulacao, s.MotivoAnulacao, m.Descricao "
+                    "FROM CabecDoc c JOIN CabecDocStatus s ON s.IdCabecDoc = c.Id "
+                    "LEFT JOIN MotivosEstorno m ON m.Motivo = s.MotivoAnulacao "
+                    "WHERE c.TipoDoc = 'ECL' AND c.Serie = %s AND c.NumDoc = %s",
+                    (serie, int(num)),
+                )
+                return cur.fetchone()
+        except Exception:
+            return None
+        finally:
+            sql_conn.close()
+
+    def _ecl_export_records(self, so):
+        return self.env["export.ecl"].sudo().search([("name", "=", so.primavera_ecl_ref)])
+
+    def _apply_ecl_anulada(self, so):
+        """Cancela a SO e põe-na (e o export.ecl) na etapa 'Anulada'.
+        ECLs listadas em primavera_connector.ecl_anulacao_ignorar ficam como estão."""
+        ignorar = {
+            x.strip() for x in (
+                self.env["ir.config_parameter"].sudo()
+                .get_param("primavera_connector.ecl_anulacao_ignorar") or ""
+            ).split(",") if x.strip()
+        }
+        if so.primavera_ecl_ref in ignorar:
+            return so
+        stage = self._get_ecl_stage_anulada()
+        if so.state == "cancel" and so.stage_id == stage:
+            return so
+        if any(m.state == "posted" for m in so.invoice_ids):
+            msg = _("%s anulada no Primavera mas tem fatura emitida no Odoo — não foi cancelada.") % so.primavera_ecl_ref
+            self._log("ecls", "error", msg)
+            self._send_sync_failure_alert("ECL anulada com fatura emitida", Exception(msg))
+            return so
+        if so.state != "cancel":
+            so.with_context(disable_cancel_warning=True).action_cancel()
+        so.stage_id = stage
+        self._ecl_export_records(so).write({"stage_id": stage.id})
+        info = self._ecl_anulacao_info(so.primavera_ecl_ref)
+        if info:
+            data_anul, utilizador, motivo, descricao = info
+            nota = _("ECL anulada no Primavera em %(data)s por %(user)s — motivo: %(motivo)s %(desc)s.") % {
+                "data": data_anul.strftime("%d/%m/%Y %H:%M") if data_anul else "?",
+                "user": utilizador or "?",
+                "motivo": motivo or "",
+                "desc": descricao or "",
+            }
+        else:
+            nota = _("ECL anulada no Primavera.")
+        so.message_post(body=nota)
+        self._log("ecls", "success", f"{so.primavera_ecl_ref}: {nota}")
+        return so
+
+    def _reactivate_ecl(self, so):
+        """Anulação desfeita no Primavera: volta a rascunho e a 'Estado Novo'
+        (o resto da sincronização reconfirma a SO e actualiza as linhas)."""
+        if so.state == "cancel":
+            so.action_draft()
+        new_stage = self.env.ref("documentos.stage_ecl_new", raise_if_not_found=False)
+        if new_stage:
+            so.stage_id = new_stage
+            self._ecl_export_records(so).write({"stage_id": new_stage.id})
+        so.message_post(body=_("Anulação desfeita no Primavera — ECL reactivada."))
+        self._log("ecls", "success", _("%s: anulação desfeita no Primavera, ECL reactivada.") % so.primavera_ecl_ref)
+
     def _resync_single_ecl(self, ecl_name):
         """Re-sincroniza UMA ECL específica do Primavera para o Odoo.
         Usado pelo botão na sale.order ou por crons de re-sync.
@@ -398,9 +497,11 @@ class PrimaveraConnection(models.Model):
             try:
                 SO = self.env["sale.order"].sudo()
                 ano = str(fields.Date.context_today(self).year)
+                anulada = self.env.ref("primavera_connector.stage_ecl_anulada", raise_if_not_found=False)
                 ecls = SO.search([
                     ("primavera_ecl_ref", "like", f"ECL/{ano}/%"),
-                    ("stage_id.fold", "=", False),
+                    "|", ("stage_id.fold", "=", False),
+                    ("stage_id", "=", anulada.id if anulada else 0),
                 ])
                 updated = 0
                 for so in ecls:
@@ -1055,6 +1156,14 @@ class PrimaveraConnection(models.Model):
 
         existing_so = SO.search([("primavera_ecl_ref", "=", ecl_name)], limit=1)
 
+        # ECL anulada no Primavera: reflectir no Odoo sem mexer nas linhas
+        if data.get("Anulado"):
+            return self._apply_ecl_anulada(existing_so) if existing_so else None
+        # Anulação desfeita no Primavera: reactivar antes de sincronizar
+        anulada = self.env.ref("primavera_connector.stage_ecl_anulada", raise_if_not_found=False)
+        if existing_so and anulada and existing_so.stage_id == anulada:
+            self._reactivate_ecl(existing_so)
+
         # Linhas de produto da ECL
         linhas = data.get("Linhas") or []
         so_lines = []
@@ -1284,6 +1393,11 @@ class PrimaveraConnection(models.Model):
 
             ecl_name = f"ECL/{serie}/{num}"
             entidade = data["Entidade"]
+
+            # ECL que já chega anulada e ainda não existe no Odoo: não criar
+            if data.get("Anulado") and not EclModel.search_count([("name", "=", ecl_name)]):
+                stats["skipped"] += 1
+                continue
 
             # Tentar encontrar o parceiro pelo código Primavera
             partner = Partner.search([("primavera_customer_code", "=", entidade)], limit=1)
