@@ -4,6 +4,7 @@ import re
 import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta, date
+from zoneinfo import ZoneInfo
 
 import requests
 from dateutil.relativedelta import relativedelta
@@ -485,28 +486,130 @@ class PrimaveraConnection(models.Model):
             incoterm_val, incoterm_local_val, pais_id, transitario_val,
         )
 
+    # Re-sync de ECLs: verificação incremental (só as ECLs com alguma alteração
+    # no Primavera desde a última vez, pelo contador de versões VersaoUltAct de
+    # CabecDoc, CabecDocStatus e LinhasDoc — apanha linhas, lotes e anulações)
+    # e uma volta completa por dia a partir das 02:00 (hora de Lisboa). Se o SQL
+    # não estiver disponível, volta à volta completa de hora a hora.
+    _ECL_FULL_RESYNC_HOUR = 2
+
+    def _ecl_resync_key(self, name):
+        return f"primavera_connector.ecl_resync.{self.id}.{name}"
+
+    def _ecl_resync_domain(self):
+        """ECLs em curso: tudo menos 'Fechado' (decisão do user: as fechadas
+        não são actualizadas); as 'Anulada' entram para apanhar anulações desfeitas."""
+        anulada = self.env.ref("primavera_connector.stage_ecl_anulada", raise_if_not_found=False)
+        return [
+            ("primavera_ecl_ref", "like", "ECL/%"),
+            "|", ("stage_id.fold", "=", False),
+            ("stage_id", "=", anulada.id if anulada else 0),
+        ]
+
+    def _changed_ecl_refs(self, since_hex):
+        """(refs de ECLs alteradas desde a versão `since_hex`, nova versão em hex)
+        ou None se o SQL Server não estiver disponível. Só leitura."""
+        sql_conn = self._sql_connection()
+        if not sql_conn:
+            return None
+        try:
+            with sql_conn.cursor() as cur:
+                cur.execute("SELECT @@DBTS")
+                new_ver = bytes(cur.fetchone()[0])
+                since = bytes.fromhex(since_hex)
+                cur.execute(
+                    "SELECT 'ECL/' + c.Serie + '/' + CAST(c.NumDoc AS varchar) "
+                    "FROM CabecDoc c LEFT JOIN CabecDocStatus s ON s.IdCabecDoc = c.Id "
+                    "WHERE c.TipoDoc = 'ECL' AND (c.VersaoUltAct > %s OR s.VersaoUltAct > %s "
+                    "OR EXISTS (SELECT 1 FROM LinhasDoc l WHERE l.IdCabecDoc = c.Id AND l.VersaoUltAct > %s))",
+                    (since, since, since),
+                )
+                refs = sorted({r[0] for r in cur.fetchall()})
+            return refs, new_ver.hex()
+        finally:
+            sql_conn.close()
+
+    def _primavera_db_version(self):
+        sql_conn = self._sql_connection()
+        if not sql_conn:
+            return None
+        try:
+            with sql_conn.cursor() as cur:
+                cur.execute("SELECT @@DBTS")
+                return bytes(cur.fetchone()[0]).hex()
+        finally:
+            sql_conn.close()
+
+    def _resync_ecls_full(self):
+        """Volta completa: todas as ECLs em curso. Devolve nº actualizadas."""
+        SO = self.env["sale.order"].sudo()
+        updated = 0
+        por_ano = defaultdict(int)
+        for so in SO.search(self._ecl_resync_domain()):
+            if self._resync_single_ecl(so.primavera_ecl_ref):
+                updated += 1
+                por_ano[so.primavera_ecl_ref.split("/")[1]] += 1
+        detalhe = ", ".join(f"{a}: {n}" for a, n in sorted(por_ano.items()))
+        self._log("ecls", "success", _("[completo] Re-sync %s ECL(s) em curso (%s).") % (updated, detalhe or "-"))
+        return updated
+
+    def _run_ecl_resync(self):
+        self.ensure_one()
+        ICP = self.env["ir.config_parameter"].sudo()
+        k_ver, k_full = self._ecl_resync_key("version"), self._ecl_resync_key("last_full")
+        now = fields.Datetime.now()
+        lisboa = now.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo("Europe/Lisbon"))
+        last_full = fields.Datetime.from_string(ICP.get_param(k_full)) if ICP.get_param(k_full) else None
+        last_full_lisboa = (
+            last_full.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo("Europe/Lisbon")) if last_full else None
+        )
+        version = ICP.get_param(k_ver)
+
+        changed = None
+        if version:
+            try:
+                changed = self._changed_ecl_refs(version)
+            except Exception:
+                changed = None
+
+        sql_ok = changed is not None
+        full_due = (
+            not version
+            or not last_full_lisboa
+            or (last_full_lisboa.date() < lisboa.date() and lisboa.hour >= self._ECL_FULL_RESYNC_HOUR)
+        )
+        if not sql_ok and version and last_full and now - last_full < timedelta(hours=1):
+            return  # SQL em baixo: volta completa no máximo de hora a hora
+        if full_due or not sql_ok:
+            new_ver = None
+            try:
+                new_ver = self._primavera_db_version()
+            except Exception:
+                pass
+            self._resync_ecls_full()
+            ICP.set_param(k_full, fields.Datetime.to_string(now))
+            if new_ver:
+                ICP.set_param(k_ver, new_ver)
+            return
+
+        refs, new_ver = changed
+        SO = self.env["sale.order"].sudo()
+        alvo = SO.search(self._ecl_resync_domain() + [("primavera_ecl_ref", "in", refs)]) if refs else SO
+        feitas = []
+        for so in alvo:
+            if self._resync_single_ecl(so.primavera_ecl_ref):
+                feitas.append(so.primavera_ecl_ref)
+        ICP.set_param(k_ver, new_ver)
+        if feitas:
+            self._log("ecls", "success", _("[incremental] %s ECL(s) alterada(s): %s") % (len(feitas), ", ".join(feitas)))
+
+    @api.model
     def cron_resync_ecls_ano_corrente(self):
-        """Cron que re-sincroniza as ECLs em curso, de qualquer ano (o nome
-        mantém-se por compatibilidade com o cron). Apanha alterações em ECLs
-        já importadas. Ignora ECLs em 'Fechado' para não as reactivar; revê as
-        'Anulada' para apanhar anulações desfeitas."""
+        """Cron de re-sync de ECLs (o nome mantém-se por compatibilidade):
+        incremental a cada execução + volta completa diária. Ver _run_ecl_resync."""
         for conn in self.search([("active", "=", True), ("sync_ecls", "=", True)]):
             try:
-                SO = self.env["sale.order"].sudo()
-                anulada = self.env.ref("primavera_connector.stage_ecl_anulada", raise_if_not_found=False)
-                ecls = SO.search([
-                    ("primavera_ecl_ref", "like", "ECL/%"),
-                    "|", ("stage_id.fold", "=", False),
-                    ("stage_id", "=", anulada.id if anulada else 0),
-                ])
-                updated = 0
-                por_ano = defaultdict(int)
-                for so in ecls:
-                    if conn._resync_single_ecl(so.primavera_ecl_ref):
-                        updated += 1
-                        por_ano[so.primavera_ecl_ref.split("/")[1]] += 1
-                detalhe = ", ".join(f"{a}: {n}" for a, n in sorted(por_ano.items()))
-                conn._log("ecls", "success", _("Re-sync %s ECL(s) em curso (%s).") % (updated, detalhe or "-"))
+                conn._run_ecl_resync()
             except Exception as e:
                 conn._log("ecls", "error", _("Erro no re-sync: %s") % e)
 
