@@ -11,6 +11,7 @@
         "security/security.xml",
         "security/ir.model.access.csv",
         "data/cron.xml",
+        "data/departamentos.xml",
         "views/project_todo_views.xml",
         "views/tarefas_menu.xml",
         "views/tarefas_template_views.xml",

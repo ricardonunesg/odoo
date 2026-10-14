@@ -33,6 +33,35 @@ class TarefasTemplate(models.Model):
 
     description = fields.Text()
 
+    departamento_id = fields.Many2one(
+        "project.tags",
+        string="Departamento",
+        index=True,
+        domain=[("is_departamento", "=", True)],
+        context={"default_is_departamento": True},
+        help="A etiqueta do departamento é aplicada às tarefas geradas.",
+    )
+
+    def write(self, vals):
+        if "departamento_id" not in vals:
+            return super().write(vals)
+        old = {t.id: t.departamento_id for t in self}
+        res = super().write(vals)
+        # Atualizar a etiqueta de departamento nas tarefas já geradas por estes templates
+        Task = self.env["project.task"].sudo().with_context(active_test=False)
+        for t in self:
+            tasks = Task.search([("tarefas_template_id", "=", t.id)])
+            if not tasks:
+                continue
+            cmds = []
+            if old[t.id] and old[t.id] != t.departamento_id:
+                cmds.append((3, old[t.id].id))
+            if t.departamento_id:
+                cmds.append((4, t.departamento_id.id))
+            if cmds:
+                tasks.write({"tag_ids": cmds})
+        return res
+
     def _next_date(self, base_date):
         self.ensure_one()
         n = int(self.interval_number or 1)
@@ -75,6 +104,7 @@ class TarefasTemplate(models.Model):
                     "date_deadline": run_date,
                     "description": t.description or "",
                     "tarefas_template_id": t.id,
+                    "tag_ids": [(6, 0, t.departamento_id.ids)],
                 })
                 task.write({"user_ids": [(6, 0, user_ids)]})
                 tasks_criadas |= task
@@ -88,6 +118,7 @@ class TarefasTemplate(models.Model):
                         "date_deadline": run_date,
                         "description": t.description or "",
                         "tarefas_template_id": t.id,
+                        "tag_ids": [(6, 0, t.departamento_id.ids)],
                     })
                     task.write({"user_ids": [(6, 0, [u.id])]})
                     tasks_criadas |= task

@@ -6,6 +6,7 @@
     <field name="name">Templates</field>
     <field name="res_model">tarefas.template</field>
     <field name="view_mode">list,form</field>
+    <field name="context">{'search_default_group_departamento': 1}</field>
   </record>
 
   <menuitem id="tarefas_templates_menu"
@@ -13,5 +14,33 @@
             parent="tarefas_root"
             action="action_tarefas_template"
             sequence="10"
+            groups="tarefas.group_tarefas_manager"/>
+
+  <record id="view_tarefas_departamento_list" model="ir.ui.view">
+    <field name="name">tarefas.departamento.list</field>
+    <field name="model">project.tags</field>
+    <field name="priority">99</field>
+    <field name="arch" type="xml">
+      <list editable="bottom">
+        <field name="name" string="Departamento"/>
+        <field name="color" widget="color_picker"/>
+      </list>
+    </field>
+  </record>
+
+  <record id="action_tarefas_departamentos" model="ir.actions.act_window">
+    <field name="name">Departamentos</field>
+    <field name="res_model">project.tags</field>
+    <field name="view_mode">list</field>
+    <field name="view_id" ref="view_tarefas_departamento_list"/>
+    <field name="domain">[('is_departamento', '=', True)]</field>
+    <field name="context">{'default_is_departamento': True}</field>
+  </record>
+
+  <menuitem id="tarefas_departamentos_menu"
+            name="Departamentos"
+            parent="tarefas_root"
+            action="action_tarefas_departamentos"
+            sequence="20"
             groups="tarefas.group_tarefas_manager"/>
 </odoo>

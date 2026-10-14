@@ -6,7 +6,9 @@
     <field name="arch" type="xml">
       <list>
         <field name="active"/>
+        <field name="departamento_id" widget="many2one_tags" options="{'color_field': 'color'}" optional="show"/>
         <field name="name"/>
+        <field name="user_ids" widget="many2many_avatar_user" optional="show"/>
         <field name="start_date"/>
         <field name="next_run_date"/>
         <field name="interval_number"/>
@@ -26,6 +28,7 @@
             <field name="active"/>
             <field name="name"/>
             <field name="task_name" placeholder="Se vazio, usa o nome do modelo"/>
+            <field name="departamento_id" options="{'no_open': True}"/>
           </group>
 
           <group string="Agenda">
@@ -46,6 +49,28 @@
           </group>
         </sheet>
       </form>
+    </field>
+  </record>
+
+  <record id="view_tarefas_template_search" model="ir.ui.view">
+    <field name="name">tarefas.template.search</field>
+    <field name="model">tarefas.template</field>
+    <field name="arch" type="xml">
+      <search>
+        <field name="name"/>
+        <field name="departamento_id"/>
+        <field name="user_ids"/>
+        <filter name="sem_departamento" string="Sem departamento" domain="[('departamento_id', '=', False)]"/>
+        <separator/>
+        <filter name="inactive" string="Arquivados" domain="[('active', '=', False)]"/>
+        <group expand="0" string="Agrupar por">
+          <filter name="group_departamento" string="Departamento" context="{'group_by': 'departamento_id'}"/>
+          <filter name="group_interval" string="Periodicidade" context="{'group_by': 'interval_type'}"/>
+        </group>
+        <searchpanel>
+          <field name="departamento_id" string="Departamentos" icon="fa-folder" enable_counters="1"/>
+        </searchpanel>
+      </search>
     </field>
   </record>
 </odoo>
