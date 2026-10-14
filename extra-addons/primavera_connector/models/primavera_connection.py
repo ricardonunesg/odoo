@@ -566,11 +566,16 @@ class PrimaveraConnection(models.Model):
         version = ICP.get_param(k_ver)
 
         changed = None
+        sql_err = None
         if version:
             try:
                 changed = self._changed_ecl_refs(version)
-            except Exception:
+                if changed is None:
+                    sql_err = _("sem ligação ao SQL Server %s:%s") % (self.sql_host, self.sql_port or 1433)
+            except Exception as exc:
                 changed = None
+                sql_err = str(exc)
+            self._track_sql_health(sql_err)
 
         sql_ok = changed is not None
         full_due = (
@@ -602,6 +607,98 @@ class PrimaveraConnection(models.Model):
         ICP.set_param(k_ver, new_ver)
         if feitas:
             self._log("ecls", "success", _("[incremental] %s ECL(s) alterada(s): %s") % (len(feitas), ", ".join(feitas)))
+
+    # ── Alerta de ligação SQL ao Primavera em baixo ─────────────────────
+    # Anti-spam: só avisa se a falha durar mais de 1 h; 1 email nessa altura,
+    # 1 lembrete por cada 24 h que continue em baixo e 1 email quando voltar
+    # (só se tiver havido aviso de falha). Estado em ir.config_parameter.
+    _SQL_ALERT_EMAILS = ["goncalo.simoes@mirazeite.com", "pedro.santos@mirazeite.com"]
+    _SQL_ALERT_AFTER = timedelta(hours=1)
+    _SQL_ALERT_REMIND = timedelta(hours=24)
+
+    def _sql_health_key(self, name):
+        return f"primavera_connector.sql_health.{self.id}.{name}"
+
+    def _send_sql_alert(self, subject, body_html):
+        Mail = self.env["mail.mail"].sudo()
+        for email in self._SQL_ALERT_EMAILS:
+            Mail.create({
+                "subject": subject,
+                "body_html": body_html,
+                "email_to": email,
+                "auto_delete": True,
+            }).send()
+
+    @staticmethod
+    def _fmt_duration(delta):
+        mins = int(delta.total_seconds() // 60)
+        if mins < 120:
+            return f"{mins} min"
+        horas = mins // 60
+        return f"{horas} h" if horas < 48 else f"{horas // 24} dias e {horas % 24} h"
+
+    def _track_sql_health(self, error):
+        """Regista o estado da ligação SQL (error=None → OK) e envia alertas.
+        Persiste o estado ANTES de enviar email, para não repetir avisos."""
+        self.ensure_one()
+        ICP = self.env["ir.config_parameter"].sudo()
+        k_since, k_alert = self._sql_health_key("down_since"), self._sql_health_key("last_alert")
+        now = fields.Datetime.now()
+        since = ICP.get_param(k_since)
+        last_alert = ICP.get_param(k_alert)
+        subject = body = None
+
+        if error is None:
+            if not since:
+                return
+            down = now - fields.Datetime.from_string(since)
+            ICP.set_param(k_since, False)
+            ICP.set_param(k_alert, False)
+            self._log("connection", "success", _("Ligação SQL ao Primavera voltou (esteve em baixo %s).") % self._fmt_duration(down))
+            if last_alert:
+                subject = f"[Primavera] Ligação SQL voltou a funcionar (esteve em baixo {self._fmt_duration(down)})"
+                body = (
+                    f"<p>A ligação de leitura ao SQL Server do Primavera <b>({self.sql_host})</b> voltou a funcionar.</p>"
+                    f"<p>Esteve em baixo cerca de <b>{self._fmt_duration(down)}</b>. As alterações feitas no "
+                    f"Primavera durante esse tempo vão ser apanhadas automaticamente nos próximos minutos.</p>"
+                    f"<p>Ligação: {self.name}</p>"
+                )
+        else:
+            if not since:
+                ICP.set_param(k_since, fields.Datetime.to_string(now))
+                self._log("connection", "error", _("Ligação SQL ao Primavera falhou: %s") % error)
+                return
+            down = now - fields.Datetime.from_string(since)
+            if down < self._SQL_ALERT_AFTER:
+                return
+            if last_alert and now - fields.Datetime.from_string(last_alert) < self._SQL_ALERT_REMIND:
+                return
+            ICP.set_param(k_alert, fields.Datetime.to_string(now))
+            lembrete = bool(last_alert)
+            subject = (
+                f"[Primavera] {'Lembrete: ' if lembrete else ''}ligação SQL em baixo há {self._fmt_duration(down)}"
+            )
+            body = (
+                f"<p>A ligação de leitura ao SQL Server do Primavera <b>({self.sql_host})</b> está em baixo "
+                f"há cerca de <b>{self._fmt_duration(down)}</b>.</p>"
+                f"<p><b>Erro:</b> {html.escape(str(error))[:500]}</p>"
+                f"<p>Enquanto durar: as alterações das ECLs chegam ao Odoo só de hora a hora (em vez de ~2 min), "
+                f"e clientes/fornecedores voltam à revisão completa. A importação de ECLs e faturas novas "
+                f"(pela WebAPI) não é afectada.</p>"
+                f"<p>Receberás outro email quando a ligação voltar"
+                f"{'' if lembrete else ', e no máximo um lembrete por dia enquanto continuar em baixo'}.</p>"
+                f"<p>Ligação: {self.name}</p>"
+            )
+            self._log("connection", "error", _("Ligação SQL ao Primavera em baixo há %s: %s") % (self._fmt_duration(down), error))
+
+        self.env.cr.commit()
+        if subject:
+            try:
+                self._send_sql_alert(subject, body)
+                self.env.cr.commit()
+            except Exception as exc:
+                self._log("connection", "error", f"Envio de email falhou: {exc}")
+                self.env.cr.commit()
 
     @api.model
     def cron_resync_ecls_ano_corrente(self):
