@@ -1,3 +1,4 @@
+import calendar
 import html
 import re
 import uuid
@@ -490,24 +491,27 @@ class PrimaveraConnection(models.Model):
         )
 
     def cron_resync_ecls_ano_corrente(self):
-        """Cron que re-sincroniza todas as ECLs do ano corrente do Primavera.
-        Apanha alterações em ECLs já importadas.
-        Ignora ECLs em stages 'folded' (Fechado) para não as reactivar."""
+        """Cron que re-sincroniza as ECLs em curso, de qualquer ano (o nome
+        mantém-se por compatibilidade com o cron). Apanha alterações em ECLs
+        já importadas. Ignora ECLs em 'Fechado' para não as reactivar; revê as
+        'Anulada' para apanhar anulações desfeitas."""
         for conn in self.search([("active", "=", True), ("sync_ecls", "=", True)]):
             try:
                 SO = self.env["sale.order"].sudo()
-                ano = str(fields.Date.context_today(self).year)
                 anulada = self.env.ref("primavera_connector.stage_ecl_anulada", raise_if_not_found=False)
                 ecls = SO.search([
-                    ("primavera_ecl_ref", "like", f"ECL/{ano}/%"),
+                    ("primavera_ecl_ref", "like", "ECL/%"),
                     "|", ("stage_id.fold", "=", False),
                     ("stage_id", "=", anulada.id if anulada else 0),
                 ])
                 updated = 0
+                por_ano = defaultdict(int)
                 for so in ecls:
                     if conn._resync_single_ecl(so.primavera_ecl_ref):
                         updated += 1
-                conn._log("ecls", "success", _("Re-sync %s ECL(s) do ano %s.") % (updated, ano))
+                        por_ano[so.primavera_ecl_ref.split("/")[1]] += 1
+                detalhe = ", ".join(f"{a}: {n}" for a, n in sorted(por_ano.items()))
+                conn._log("ecls", "success", _("Re-sync %s ECL(s) em curso (%s).") % (updated, detalhe or "-"))
             except Exception as e:
                 conn._log("ecls", "error", _("Erro no re-sync: %s") % e)
 
@@ -721,17 +725,7 @@ class PrimaveraConnection(models.Model):
     def cron_import_faturas_only(self):
         for conn in self.search([("active", "=", True), ("sync_faturas", "=", True)]):
             try:
-                stats_fa = conn._import_faturas_doc(
-                    "FA", conn.fa_serie, conn.fa_last_imported_num,
-                    conn.fa_scan_max, conn.fa_miss_stop, "fa_last_imported_num",
-                )
-                if conn.sync_faturas_fat:
-                    stats_fat = conn._import_faturas_doc(
-                        "FAT", conn.fat_serie, conn.fat_last_imported_num,
-                        conn.fat_scan_max, conn.fat_miss_stop, "fat_last_imported_num",
-                    )
-                    for k in stats_fa:
-                        stats_fa[k] += stats_fat[k]
+                stats_fa = conn._import_faturas()
                 if stats_fa["created"] or stats_fa["updated"]:
                     conn._log("faturas", "success", conn._stats_msg(stats_fa))
             except Exception as exc:
@@ -1353,24 +1347,99 @@ class PrimaveraConnection(models.Model):
     # IMPORTAÇÃO DE ECLs
     # ─────────────────────────────────────────────────────────────────────
 
+    # ─────────────────────────────────────────────────────────────────────
+    # MUDANÇA DE ANO DAS SÉRIES (ECL / FA / FAT)
+    # ─────────────────────────────────────────────────────────────────────
+    # As séries do Primavera são o ano (ex.: ECL/2026/…). Na primeira execução
+    # de um ano novo, a série configurada passa para o ano corrente e o
+    # contador recomeça; a série anterior continua a ser vigiada para
+    # documentos atrasados até ao fim do mês _PREV_SERIES_UNTIL_MONTH.
+
+    _SERIES_FIELDS = {
+        "ECL": ("ecl_serie", "ecl_last_imported_num"),
+        "FA": ("fa_serie", "fa_last_imported_num"),
+        "FAT": ("fat_serie", "fat_last_imported_num"),
+    }
+    _PREV_SERIES_UNTIL_MONTH = 5  # vigiar a série do ano anterior até 31/05
+
+    def _prev_series_key(self, doc_type):
+        return f"primavera_connector.prev_serie.{self.id}.{doc_type}"
+
+    def _check_series_rollover(self, doc_type):
+        """Passa a série para o ano corrente se ainda estiver num ano anterior.
+        Só actua em séries numéricas (ex.: '2026'); séries especiais ficam."""
+        serie_f, last_f = self._SERIES_FIELDS[doc_type]
+        today = fields.Date.context_today(self)
+        old = (self[serie_f] or "").strip()
+        if not (old.isdigit() and int(old) < today.year):
+            return
+        new = str(today.year)
+        last = self[last_f] or 0
+        self.env["ir.config_parameter"].sudo().set_param(
+            self._prev_series_key(doc_type), f"{old}:{last}")
+        self.write({serie_f: new, last_f: 0})
+        self._log(
+            "ecls" if doc_type == "ECL" else "faturas", "success",
+            _("Mudança de ano: série %(t)s %(new)s iniciada. Série %(old)s continua vigiada "
+              "até %(ate)s (última: %(t)s/%(old)s/%(last)s).") % {
+                "t": doc_type, "new": new, "old": old, "last": last,
+                "ate": f"{calendar.monthrange(today.year, self._PREV_SERIES_UNTIL_MONTH)[1]:02d}/"
+                       f"{self._PREV_SERIES_UNTIL_MONTH:02d}/{today.year}",
+            })
+
+    def _prev_series(self, doc_type):
+        """(série, último nº) do ano anterior se ainda estiver a ser vigiada."""
+        today = fields.Date.context_today(self)
+        if today.month > self._PREV_SERIES_UNTIL_MONTH:
+            return None
+        val = self.env["ir.config_parameter"].sudo().get_param(self._prev_series_key(doc_type)) or ""
+        serie, _sep, last = val.partition(":")
+        if serie != str(today.year - 1):
+            return None
+        return serie, int(last or 0)
+
+    def _set_prev_series_last(self, doc_type, serie, last):
+        self.env["ir.config_parameter"].sudo().set_param(
+            self._prev_series_key(doc_type), f"{serie}:{last}")
+
     def _import_ecls(self):
-        """Varre ECLs por número sequencial e importa para export.ecl."""
+        """Importa ECLs novas da série do ano corrente e, até 31/05, também da
+        série do ano anterior (documentos atrasados)."""
         self.ensure_one()
+        self._check_series_rollover("ECL")
+        stats = self._import_ecls_serie()
+        prev = self._prev_series("ECL")
+        if prev:
+            serie, last = prev
+            stats_prev = self._import_ecls_serie(serie=serie, last_num=last)
+            self._set_prev_series_last("ECL", serie, stats_prev.pop("_last"))
+            for k in stats:
+                stats[k] += stats_prev[k]
+        return stats
+
+    def _import_ecls_serie(self, serie=None, last_num=None):
+        """Varre ECLs por número sequencial e importa para export.ecl.
+        Sem argumentos usa a série/contador configurados (e grava o contador);
+        com `serie`/`last_num` (série anterior) devolve o último nº em stats['_last']."""
+        self.ensure_one()
+        current = serie is None
 
         if "export.ecl" not in self.env:
-            return {"created": 0, "updated": 0, "skipped": 0}
+            return {"created": 0, "updated": 0, "skipped": 0, **({} if current else {"_last": last_num or 0})}
 
         stats = {"created": 0, "updated": 0, "skipped": 0}
         EclModel = self.env["export.ecl"].sudo()
         Partner = self.env["res.partner"].sudo().with_context(active_test=False)
 
-        serie = self.ecl_serie or "2026"
+        if current:
+            serie = self.ecl_serie or str(fields.Date.context_today(self).year)
+            last_num = self.ecl_last_imported_num or 0
         filial = self.api_filial or "000"
-        start = (self.ecl_last_imported_num or 0) + 1
+        start = (last_num or 0) + 1
         max_num = self.ecl_scan_max or 500
         miss_stop = self.ecl_miss_stop or 50
         consecutive_misses = 0
-        last_imported = self.ecl_last_imported_num or 0
+        last_imported = last_num or 0
 
         for num in range(start, start + max_num):
             ep = f"/v2/Vendas/Docs/Edita/{filial}/ECL/{serie}/{num}"
@@ -1473,6 +1542,13 @@ class PrimaveraConnection(models.Model):
                 EclModel.create(ecl_vals)
                 stats["created"] += 1
 
+        if not current:
+            # Série do ano anterior: só registar quando houver novidades
+            if stats["created"] or stats["updated"]:
+                self._log("ecls", "success", f"[{serie}] {self._stats_msg(stats)}")
+            stats["_last"] = last_imported
+            return stats
+
         # Guardar último número importado
         if last_imported > (self.ecl_last_imported_num or 0):
             self.ecl_last_imported_num = last_imported
@@ -1485,18 +1561,26 @@ class PrimaveraConnection(models.Model):
     # ─────────────────────────────────────────────────────────────────────
 
     def _import_faturas(self):
-        stats_fa = self._import_faturas_doc(
-            "FA", self.fa_serie, self.fa_last_imported_num,
-            self.fa_scan_max, self.fa_miss_stop, "fa_last_imported_num",
-        )
+        """FA (+ FAT) da série do ano corrente e, até 31/05, da série anterior."""
+        self.ensure_one()
+        docs = [("FA", "fa_serie", "fa_last_imported_num", self.fa_scan_max, self.fa_miss_stop)]
         if self.sync_faturas_fat:
-            stats_fat = self._import_faturas_doc(
-                "FAT", self.fat_serie, self.fat_last_imported_num,
-                self.fat_scan_max, self.fat_miss_stop, "fat_last_imported_num",
-            )
-            for k in stats_fa:
-                stats_fa[k] += stats_fat[k]
-        return stats_fa
+            docs.append(("FAT", "fat_serie", "fat_last_imported_num", self.fat_scan_max, self.fat_miss_stop))
+        total = {"created": 0, "updated": 0, "skipped": 0}
+        for doc_type, serie_f, last_f, scan_max, miss_stop in docs:
+            self._check_series_rollover(doc_type)
+            stats = self._import_faturas_doc(
+                doc_type, self[serie_f], self[last_f], scan_max, miss_stop, last_f)
+            prev = self._prev_series(doc_type)
+            if prev:
+                serie, last = prev
+                stats_prev = self._import_faturas_doc(doc_type, serie, last, scan_max, miss_stop, None)
+                self._set_prev_series_last(doc_type, serie, stats_prev.pop("_last"))
+                for k in stats:
+                    stats[k] += stats_prev[k]
+            for k in total:
+                total[k] += stats[k]
+        return total
 
     def _import_faturas_doc(self, doc_type, serie, last_num, scan_max, miss_stop, counter_field):
         """Importa faturas de um tipo de documento para account.move."""
@@ -1757,6 +1841,13 @@ class PrimaveraConnection(models.Model):
             # ── Ligar a ECL e criar todos ──────────────────────────────────
             if origens:
                 self._link_fatura_to_ecl(target_move, fatura_name, origens)
+
+        if not counter_field:
+            # Série do ano anterior: contador guardado por quem chama
+            if stats["created"] or stats["updated"]:
+                self._log("faturas", "success", f"[{doc_type}/{serie}] {self._stats_msg(stats)}")
+            stats["_last"] = last_imported
+            return stats
 
         if last_imported > (last_num or 0):
             self.write({counter_field: last_imported})
