@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <menuitem id="tarefas_root" name="Tarefas" sequence="10" groups="tarefas.group_tarefas_manager"/>
+  <menuitem id="tarefas_root" name="Tarefas" sequence="10" web_icon="tarefas,static/description/icon.svg" groups="tarefas.group_tarefas_manager"/>
 
   <record id="action_tarefas_template" model="ir.actions.act_window">
     <field name="name">Templates</field>

@@ -1,7 +1,7 @@
 {
     "name": "Tarefas (Templates + Agenda) - Odoo 18",
     "version": "18.0.1.0.0",
-    "depends": ["project", "project_todo"],
+    "depends": ["project", "project_todo", "crm"],
     "installable": True,
     "application": True,
     "data": [

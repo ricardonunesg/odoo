@@ -7,7 +7,8 @@ class TarefasTemplate(models.Model):
     _description = "Template de Tarefas Agendadas"
     _order = "active desc, next_run_date asc, name"
 
-    name = fields.Char(required=True)
+    name = fields.Char("Nome do modelo", required=True)
+    task_name = fields.Char("Nome da tarefa", help="Nome que será atribuído às tarefas criadas. Se vazio, usa o nome do modelo.")
     active = fields.Boolean(default=True)
 
     start_date = fields.Date(required=True, default=fields.Date.context_today)
@@ -22,6 +23,13 @@ class TarefasTemplate(models.Model):
 
     user_ids = fields.Many2many("res.users", string="Utilizadores", required=True)
     allow_overlap = fields.Boolean(string="Permitir tarefas em simultâneo", default=False)
+    shared_task = fields.Boolean(
+        string="Tarefa partilhada",
+        default=False,
+        help="Se activo, cria UMA única tarefa atribuída a todos os utilizadores. "
+             "Se um deles a marcar como Done, fica Done para todos. "
+             "Caso contrário, é criada uma tarefa separada para cada utilizador.",
+    )
 
     description = fields.Text()
 
@@ -56,23 +64,50 @@ class TarefasTemplate(models.Model):
                     t.next_run_date = t._next_date(run_date)
                     continue
 
-            # Criar 1 task por utilizador (To Do usa user_ids, não user_id)
-            for u in t.user_ids:
-                task = Task.with_context(
-                    mail_create_nosubscribe=True,
-                    mail_auto_subscribe_no_notify=True,
-                ).create({
-                    "name": t.name,
-                    "user_ids": [(6, 0, [u.id])],
+            tasks_criadas = Task.browse()
+            tasks_assignees = {}  # task_id -> [user_id, user_id, ...]
+            if t.shared_task:
+                # UMA única tarefa atribuída a todos
+                user_ids = t.user_ids.ids
+                task = Task.create({
+                    "name": t.task_name or t.name,
+                    "user_ids": [(6, 0, user_ids)],
                     "date_deadline": run_date,
                     "description": t.description or "",
                     "tarefas_template_id": t.id,
                 })
+                task.write({"user_ids": [(6, 0, user_ids)]})
+                tasks_criadas |= task
+                tasks_assignees[task.id] = user_ids
+            else:
+                # Uma task por utilizador
+                for u in t.user_ids:
+                    task = Task.create({
+                        "name": t.task_name or t.name,
+                        "user_ids": [(6, 0, [u.id])],
+                        "date_deadline": run_date,
+                        "description": t.description or "",
+                        "tarefas_template_id": t.id,
+                    })
+                    task.write({"user_ids": [(6, 0, [u.id])]})
+                    tasks_criadas |= task
+                    tasks_assignees[task.id] = [u.id]
 
-                # Forçar (se algum default meter mais users)
-                task.write({
-                    "user_ids": [(6, 0, [u.id])],
-                })
+            # Followers: manter apenas os assignees reais (limpar o utilizador que correu o cron)
+            if tasks_criadas:
+                Follower = self.env['mail.followers'].sudo()
+                User = self.env['res.users'].sudo()
+                for task in tasks_criadas:
+                    desired_user_ids = tasks_assignees.get(task.id, [])
+                    desired_partner_ids = User.browse(desired_user_ids).mapped('partner_id').ids
+                    # Apagar todos os followers actuais
+                    Follower.search([
+                        ('res_model', '=', 'project.task'),
+                        ('res_id', '=', task.id),
+                    ]).unlink()
+                    # Voltar a subscrever apenas os assignees
+                    if desired_partner_ids:
+                        task.message_subscribe(partner_ids=desired_partner_ids)
 
             # Avançar agenda
             t.next_run_date = t._next_date(run_date)
