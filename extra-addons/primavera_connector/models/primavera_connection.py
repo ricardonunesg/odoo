@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 from dateutil.relativedelta import relativedelta
+from markupsafe import Markup
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
@@ -432,9 +433,140 @@ class PrimaveraConnection(models.Model):
             }
         else:
             nota = _("ECL anulada no Primavera.")
-        so.message_post(body=nota)
-        self._log("ecls", "success", f"{so.primavera_ecl_ref}: {nota}")
+        self._ecl_post_change(so, html.escape(nota))
+        self._log("ecls", "success", f"[notificação] {so.primavera_ecl_ref}: {nota}")
         return so
+
+    # ─────────────────────────────────────────────────────────────────────
+    # NOTIFICAÇÕES DE ALTERAÇÕES DE ECL
+    # ─────────────────────────────────────────────────────────────────────
+    # Fase 1 (14/10/2026): notifica só os parceiros listados no parâmetro
+    # _ECL_NOTIFY_PARAM (Gonçalo Simões), pelo sininho do Odoo. Notifica:
+    # quantidade, artigo novo/removido, preço, cabeçalho (data, incoterm,
+    # local, país, transitário), anulação e anulação desfeita. NÃO notifica
+    # lotes/validades nem ECLs novas (decisão do user).
+    _ECL_NOTIFY_PARAM = "primavera_connector.ecl_change_notify_partner_ids"
+    _ECL_HEAD_FIELDS = [
+        ("ecl_incoterm", "Incoterm"),
+        ("ecl_incoterm_local", "Local do incoterm"),
+        ("ecl_pais_destino_id", "País de destino"),
+        ("ecl_transitario", "Transitário"),
+    ]
+
+    def _ecl_notify_partners(self):
+        raw = self.env["ir.config_parameter"].sudo().get_param(self._ECL_NOTIFY_PARAM) or ""
+        ids = [int(x) for x in raw.split(",") if x.strip().isdigit()]
+        return self.env["res.partner"].sudo().browse(ids).exists()
+
+    def _ecl_post_change(self, so, body_html):
+        """Regista a alteração no histórico da ECL SEM avisar ninguém e envia uma
+        notificação (sininho) só aos parceiros configurados. Não se usa
+        message_post: os seguidores das encomendas estão inscritos nas notas
+        internas e seriam todos avisados."""
+        so._message_log(body=Markup(body_html))
+        partners = self._ecl_notify_partners()
+        if partners:
+            so.message_notify(
+                partner_ids=partners.ids,
+                subject=f"{so.primavera_ecl_ref or so.name} — {so.partner_id.name or ''}",
+                body=Markup(body_html),
+            )
+
+    @staticmethod
+    def _fmt_num(v, decimals=None):
+        if decimals is None:
+            s = f"{v:g}"
+        else:
+            s = f"{v:.{decimals}f}"
+        return s.replace(".", ",")
+
+    def _ecl_snapshot(self, so):
+        lines = {}
+        for l in so.order_line:
+            if l.display_type or not l.product_id:
+                continue
+            k = l.product_id.default_code or l.product_id.display_name
+            d = lines.setdefault(k, {"qty": 0.0, "prices": set()})
+            d["qty"] += l.product_uom_qty
+            d["prices"].add(round(l.price_unit, 4))
+        head = {"Data": so.date_order.date() if so.date_order else False}
+        for f, label in self._ECL_HEAD_FIELDS:
+            v = so[f]
+            head[label] = (v.display_name if hasattr(v, "_name") else v) or ""
+        return {"lines": lines, "head": head}
+
+    def _ecl_diff(self, before, after):
+        out = []
+        bl, al = before["lines"], after["lines"]
+        for k in sorted(set(bl) | set(al)):
+            b, a = bl.get(k), al.get(k)
+            if b and not a:
+                out.append(f"Linha removida: {k} — {self._fmt_num(b['qty'])}")
+            elif a and not b:
+                out.append(f"Linha nova: {k} — {self._fmt_num(a['qty'])}")
+            else:
+                if abs(a["qty"] - b["qty"]) > 0.0001:
+                    out.append(f"{k} — quantidade {self._fmt_num(b['qty'])} → {self._fmt_num(a['qty'])}")
+                if a["prices"] != b["prices"]:
+                    fmt = lambda s: " / ".join(self._fmt_num(p, 2) for p in sorted(s))
+                    out.append(f"{k} — preço {fmt(b['prices'])} → {fmt(a['prices'])}")
+        for label, bv in before["head"].items():
+            av = after["head"].get(label)
+            if (bv or "") != (av or ""):
+                if label == "Data":
+                    bv = bv.strftime("%d/%m/%Y") if bv else ""
+                    av = av.strftime("%d/%m/%Y") if av else ""
+                out.append(f"{label}: {bv or '(vazio)'} → {av or '(vazio)'}")
+        return out
+
+    def _ecl_notify_changes(self, so, before):
+        if before is None:
+            return
+        diffs = self._ecl_diff(before, self._ecl_snapshot(so))
+        if not diffs:
+            return
+        quando = fields.Datetime.context_timestamp(
+            self.with_context(tz="Europe/Lisbon"), fields.Datetime.now()).strftime("%d/%m/%Y %H:%M")
+        body = (
+            f"<p><b>ECL alterada no Primavera</b> ({quando}):</p><ul>"
+            + "".join(f"<li>{html.escape(d)}</li>" for d in diffs)
+            + "</ul>"
+        )
+        self._ecl_post_change(so, body)
+        self._log("ecls", "success", f"[notificação] {so.primavera_ecl_ref}: {len(diffs)} alteração(ões): " + "; ".join(diffs)[:400])
+
+    @api.model
+    def _cron_fim_fase1_notificacoes_ecl(self):
+        """Notificação única no fim da fase 1 (21/10/2026): resumo da semana e
+        convite para decidir a fase 2. Desliga o próprio cron no fim."""
+        Log = self.env["primavera.sync.log"].sudo()
+        desde = fields.Datetime.now() - timedelta(days=7)
+        logs = Log.search([("operation", "=", "ecls"), ("message", "=like", "[notificação]%"),
+                           ("create_date", ">=", desde)])
+        anul = len(logs.filtered(lambda l: "anulada no Primavera" in l.message))
+        react = len(logs.filtered(lambda l: "anulação desfeita" in l.message))
+        alter = len(logs) - anul - react
+        dias = defaultdict(int)
+        for l in logs:
+            dias[fields.Date.to_string(l.create_date.date())] += 1
+        por_dia = "".join(f"<li>{d}: {n}</li>" for d, n in sorted(dias.items())) or "<li>(nenhuma)</li>"
+        body = (
+            "<p><b>Fim da fase 1 das notificações de alterações de ECL.</b></p>"
+            f"<p>Na última semana recebeste <b>{len(logs)}</b> notificações: {alter} de alterações, "
+            f"{anul} de anulações e {react} de anulações desfeitas.</p>"
+            f"<p>Por dia:</p><ul>{por_dia}</ul>"
+            "<p>Está na altura de decidirmos a fase 2: quem passa a receber estas notificações e se "
+            "mudamos algum tipo. Fala com o Claude para combinarmos.</p>"
+        )
+        partners = self.search([], limit=1)._ecl_notify_partners()
+        if partners:
+            partners[:1].message_notify(
+                partner_ids=partners.ids,
+                subject="Notificações de ECL: fim da fase 1",
+                body=Markup(body),
+            )
+        crons = self.env["ir.cron"].sudo().search([("code", "like", "_cron_fim_fase1_notificacoes_ecl")])
+        crons.write({"active": False})
 
     def _reactivate_ecl(self, so):
         """Anulação desfeita no Primavera: volta a rascunho e a 'Estado Novo'
@@ -444,8 +576,8 @@ class PrimaveraConnection(models.Model):
         new_stage = self.env.ref("documentos.stage_ecl_new", raise_if_not_found=False)
         if new_stage:
             so.stage_id = new_stage
-        so.message_post(body=_("Anulação desfeita no Primavera — ECL reactivada."))
-        self._log("ecls", "success", _("%s: anulação desfeita no Primavera, ECL reactivada.") % so.primavera_ecl_ref)
+        self._ecl_post_change(so, html.escape(_("Anulação desfeita no Primavera — ECL reactivada.")))
+        self._log("ecls", "success", _("[notificação] %s: anulação desfeita no Primavera, ECL reactivada.") % so.primavera_ecl_ref)
 
     def _resync_single_ecl(self, ecl_name):
         """Re-sincroniza UMA ECL específica do Primavera para o Odoo.
@@ -1376,6 +1508,8 @@ class PrimaveraConnection(models.Model):
         anulada = self.env.ref("primavera_connector.stage_ecl_anulada", raise_if_not_found=False)
         if existing_so and anulada and existing_so.stage_id == anulada:
             self._reactivate_ecl(existing_so)
+        # Fotografia antes da sincronização, para notificar o que mudou
+        before = self._ecl_snapshot(existing_so) if existing_so else None
 
         # Linhas de produto da ECL
         linhas = data.get("Linhas") or []
@@ -1495,6 +1629,7 @@ class PrimaveraConnection(models.Model):
             # Reconfirmar se estava em 'sale' antes do reset, ou se ainda está em 'draft'
             if previous_state == "sale" or existing_so.state == "draft":
                 existing_so.write({"state": "sale"})
+            self._ecl_notify_changes(existing_so, before)
             return existing_so
         else:
             if so_lines:
