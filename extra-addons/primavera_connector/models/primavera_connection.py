@@ -1616,6 +1616,20 @@ class PrimaveraConnection(models.Model):
 
         if existing_so:
             update = {k: v for k, v in so_vals.items() if k != "partner_id"}
+            # Campos de cabeçalho apagados no Primavera ficam vazios também no
+            # Odoo (14/10/2026). Só se a API trouxe os campos de utilizador, para
+            # não apagar por falta de dados; o país só é limpo se o código estiver
+            # vazio (um código desconhecido mantém o país actual).
+            if "CamposUtil" in data:
+                cu = {c.get("Nome"): c.get("Valor") for c in (data.get("CamposUtil") or []) if c.get("Nome")}
+                for campo, chave in (
+                    ("ecl_incoterm", "CDU_Incoterm"),
+                    ("ecl_incoterm_local", "CDU_IncotermLocal"),
+                    ("ecl_transitario", "CDU_transitario"),
+                    ("ecl_pais_destino_id", "CDU_Pais"),
+                ):
+                    if campo not in update and not self._clean(cu.get(chave)) and existing_so[campo]:
+                        update[campo] = False
             # Atualizar linhas se a SO ainda não está bloqueada
             # (não tem faturas posted e não está em cancel/done) — Primavera é a fonte de verdade
             has_posted_invoice = any(
