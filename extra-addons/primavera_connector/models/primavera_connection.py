@@ -991,42 +991,66 @@ class PrimaveraConnection(models.Model):
                 "auto_delete": True,
             }).send()
 
+    # Anti-spam do alerta da WebAPI: falhas curtas só ficam no log; email só
+    # quando a API está em baixo há mais de _API_ALERT_AFTER, um lembrete por
+    # cada 24 h que continue em baixo e um email quando voltar (só se tiver
+    # havido aviso). Logs com a operação 'connection' — o valor 'health' não
+    # existe em primavera.sync.log e fazia o alerta rebentar antes do email.
+    _API_ALERT_AFTER = timedelta(minutes=30)
+    _API_ALERT_REMIND = timedelta(hours=24)
+
     def _run_health_check(self):
-        """Corre health check e envia alerta apenas em transições saudável↔falha.
-        Persiste estado ANTES de enviar email (para não spammar se send crashar)."""
+        """Corre health check e envia alertas com anti-spam.
+        Persiste estado ANTES de enviar email (para não repetir se send crashar)."""
         self.ensure_one()
+        ICP = self.env["ir.config_parameter"].sudo()
+        k_alert = f"primavera_connector.api_health.{self.id}.last_alert"
         now = fields.Datetime.now()
         ok, msg = self._probe_api()
-        prev_healthy = self.api_healthy
+        last_alert = ICP.get_param(k_alert)
 
         vals = {"api_health_last_check": now, "api_health_last_message": msg}
         alert_subject = alert_body = None
 
-        if ok and not prev_healthy:
-            downtime = ""
-            if self.api_health_fail_since:
-                delta = now - self.api_health_fail_since
-                mins = int(delta.total_seconds() // 60)
-                downtime = f" (esteve indisponível ~{mins} min)"
-            vals.update({"api_healthy": True, "api_health_fail_since": False})
-            alert_subject = f"[Primavera] API voltou a responder{downtime}"
-            alert_body = (
-                f"<p>A API Primavera <b>({self.api_url})</b> voltou a responder normalmente.</p>"
-                f"<p>Health check em: {now}</p>"
-                f"<p>Ligação: {self.name}</p>"
-            )
-            self._log("health", "success", f"API recuperou{downtime}")
-        elif not ok and prev_healthy:
-            vals.update({"api_healthy": False, "api_health_fail_since": now})
-            alert_subject = "[Primavera] API NÃO responde — sincronização parada"
-            alert_body = (
-                f"<p>A API Primavera <b>({self.api_url})</b> deixou de responder.</p>"
-                f"<p><b>Erro:</b> {msg}</p>"
-                f"<p>Enquanto isto durar, as ECLs, faturas e restantes crons ficam parados. "
-                f"Assim que a API voltar receberás outra notificação.</p>"
-                f"<p>Ligação: {self.name} — Detectado em {now}</p>"
-            )
-            self._log("health", "error", f"API caída: {msg}")
+        if ok:
+            if not self.api_healthy:
+                down = now - self.api_health_fail_since if self.api_health_fail_since else timedelta(0)
+                vals.update({"api_healthy": True, "api_health_fail_since": False})
+                self._log("connection", "success", f"WebAPI voltou a responder (esteve em baixo {self._fmt_duration(down)}).")
+                if last_alert:
+                    ICP.set_param(k_alert, False)
+                    alert_subject = f"[Primavera] WebAPI voltou a responder (esteve em baixo {self._fmt_duration(down)})"
+                    alert_body = (
+                        f"<p>A WebAPI do Primavera <b>({self.api_url})</b> voltou a responder normalmente.</p>"
+                        f"<p>Esteve em baixo cerca de <b>{self._fmt_duration(down)}</b>. As ECLs e faturas criadas "
+                        f"entretanto vão entrar no Odoo nos próximos minutos.</p>"
+                        f"<p>Ligação: {self.name}</p>"
+                    )
+        else:
+            if self.api_healthy or not self.api_health_fail_since:
+                vals.update({"api_healthy": False, "api_health_fail_since": now})
+                self._log("connection", "error", f"WebAPI não responde: {msg}")
+            else:
+                down = now - self.api_health_fail_since
+                remind_due = not last_alert or now - fields.Datetime.from_string(last_alert) >= self._API_ALERT_REMIND
+                if down >= self._API_ALERT_AFTER and remind_due:
+                    lembrete = bool(last_alert)
+                    ICP.set_param(k_alert, fields.Datetime.to_string(now))
+                    alert_subject = (
+                        f"[Primavera] {'Lembrete: ' if lembrete else ''}WebAPI não responde há {self._fmt_duration(down)}"
+                    )
+                    alert_body = (
+                        f"<p>A WebAPI do Primavera <b>({self.api_url})</b> não responde há cerca de "
+                        f"<b>{self._fmt_duration(down)}</b>.</p>"
+                        f"<p><b>Último erro:</b> {html.escape(str(msg))[:500]}</p>"
+                        f"<p>Enquanto durar, as ECLs e faturas novas não entram no Odoo e as restantes "
+                        f"sincronizações com o Primavera ficam paradas.</p>"
+                        f"<p>Receberás outro email quando a WebAPI voltar"
+                        f"{'' if lembrete else ', e no máximo um lembrete por dia enquanto continuar em baixo'}.</p>"
+                        f"<p>Ligação: {self.name}</p>"
+                    )
+                    self._log("connection", "error",
+                              f"WebAPI em baixo há {self._fmt_duration(down)} — aviso enviado: {msg}")
 
         # 1. Persistir estado + log ANTES de enviar email
         self.write(vals)
@@ -1038,7 +1062,7 @@ class PrimaveraConnection(models.Model):
                 self._send_api_alert(alert_subject, alert_body)
                 self.env.cr.commit()
             except Exception as exc:
-                self._log("health", "error", f"Envio de email falhou: {exc}")
+                self._log("connection", "error", f"Envio de email falhou: {exc}")
                 self.env.cr.commit()
 
     @api.model
@@ -1047,7 +1071,7 @@ class PrimaveraConnection(models.Model):
             try:
                 conn._run_health_check()
             except Exception as exc:
-                conn._log("health", "error", f"Health check crashou: {exc}")
+                conn._log("connection", "error", f"Health check da WebAPI crashou: {exc}")
 
     # ─────────────────────────────────────────────────────────────────────
     # IMPORTAÇÃO DE FUNCIONÁRIOS (WebAPI Primavera → hr.employee)
