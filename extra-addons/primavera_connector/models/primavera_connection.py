@@ -510,12 +510,78 @@ class PrimaveraConnection(models.Model):
             # Não deixar o email atrapalhar o rollback nem o log da falha original
             pass
 
+    # Sync incremental de parceiros: entre voltas completas só se importam os
+    # parceiros cuja DataUltimaActualizacao/DataCriacao no Primavera mudou desde
+    # a última execução (SELECT only). A volta completa corre uma vez por dia, a
+    # partir das 02h (hora do Primavera), e sempre que o SQL não esteja
+    # disponível. Os marcadores guardam a hora do próprio Primavera, para evitar
+    # diferenças de fuso horário.
+    _PARTNER_SQL = {
+        "customer": ("Clientes", "Cliente"),
+        "supplier": ("Fornecedores", "Fornecedor"),
+    }
+
+    def _changed_partner_codes(self, partner_type, since):
+        """Devolve (códigos alterados desde `since`, hora actual do Primavera)
+        ou None se o SQL Server não estiver disponível."""
+        table, key = self._PARTNER_SQL[partner_type]
+        if partner_type == "customer":
+            prefix = self.customer_code_prefix or "CL"
+        else:
+            prefix = self.supplier_code_prefix or "FO"
+        sql_conn = self._sql_connection()
+        if not sql_conn:
+            return None
+        try:
+            with sql_conn.cursor() as cur:
+                cur.execute("SELECT GETDATE()")
+                now = cur.fetchone()[0]
+                cur.execute(
+                    f"SELECT {key} FROM {table} WHERE {key} LIKE %s "
+                    f"AND (DataUltimaActualizacao >= %s OR DataCriacao >= %s) "
+                    f"ORDER BY {key}",
+                    (prefix + "%", since, since),
+                )
+                codes = [r[0].strip() for r in cur.fetchall() if r[0]]
+            return codes, now
+        finally:
+            sql_conn.close()
+
+    def _run_partner_sync(self, partner_type):
+        """Escolhe entre volta completa e incremental. Devolve (stats, modo)."""
+        self.ensure_one()
+        ICP = self.env["ir.config_parameter"].sudo()
+        key = f"primavera_connector.partner_sync.{self.id}.{partner_type}"
+        last_inc = ICP.get_param(f"{key}.last_incremental")
+        last_full = ICP.get_param(f"{key}.last_full")
+        if last_inc:
+            since = fields.Datetime.from_string(last_inc) - timedelta(minutes=10)
+        else:
+            since = datetime(1900, 1, 1)
+        try:
+            changed, now = self._changed_partner_codes(partner_type, since) or (None, None)
+        except Exception:
+            changed = now = None
+        full = (
+            now is None
+            or not last_inc
+            or not last_full
+            or (fields.Datetime.from_string(last_full).date() < now.date() and now.hour >= 2)
+        )
+        stats = self._import_partners(partner_type, codes=None if full else changed)
+        if now is not None:
+            ICP.set_param(f"{key}.last_incremental", fields.Datetime.to_string(now))
+            if full:
+                ICP.set_param(f"{key}.last_full", fields.Datetime.to_string(now))
+        mode = _("completo") if full else _("incremental, %s alterados") % len(changed)
+        return stats, mode
+
     @api.model
     def cron_import_customers_only(self):
         for conn in self.search([("active", "=", True), ("sync_customers", "=", True)]):
             try:
-                stats = conn._import_partners("customer")
-                conn._log("customers", "success", conn._stats_msg(stats))
+                stats, mode = conn._run_partner_sync("customer")
+                conn._log("customers", "success", f"[{mode}] {conn._stats_msg(stats)}")
             except Exception as exc:
                 conn._log("customers", "error", str(exc))
                 conn._send_sync_failure_alert("clientes", exc)
@@ -524,8 +590,8 @@ class PrimaveraConnection(models.Model):
     def cron_import_suppliers_only(self):
         for conn in self.search([("active", "=", True), ("sync_suppliers", "=", True)]):
             try:
-                stats = conn._import_partners("supplier")
-                conn._log("suppliers", "success", conn._stats_msg(stats))
+                stats, mode = conn._run_partner_sync("supplier")
+                conn._log("suppliers", "success", f"[{mode}] {conn._stats_msg(stats)}")
             except Exception as exc:
                 conn._log("suppliers", "error", str(exc))
                 conn._send_sync_failure_alert("fornecedores", exc)
@@ -892,8 +958,9 @@ class PrimaveraConnection(models.Model):
     # IMPORTAÇÃO DE PARCEIROS (Clientes / Fornecedores)
     # ─────────────────────────────────────────────────────────────────────
 
-    def _import_partners(self, partner_type):
-        """Varre códigos sequencialmente e importa cada parceiro encontrado."""
+    def _import_partners(self, partner_type, codes=None):
+        """Varre códigos sequencialmente e importa cada parceiro encontrado.
+        Se `codes` for dado (sync incremental), processa só esses códigos."""
         self.ensure_one()
         if partner_type == "customer":
             prefix = self.customer_code_prefix or "CL"
@@ -919,10 +986,15 @@ class PrimaveraConnection(models.Model):
         category = self.env.ref(category_xmlid)
         consecutive_misses = 0
 
-        for num in range(1, max_num + 1):
-            code = f"{prefix}{str(num).zfill(digits)}"
+        if codes is not None:
+            scan = codes
+        else:
+            scan = (f"{prefix}{str(num).zfill(digits)}" for num in range(1, max_num + 1))
 
+        for code in scan:
             if not self._exists(f"{base_ep}/Existe/{code}"):
+                if codes is not None:
+                    continue
                 consecutive_misses += 1
                 if consecutive_misses >= self.consecutive_misses_stop:
                     break
