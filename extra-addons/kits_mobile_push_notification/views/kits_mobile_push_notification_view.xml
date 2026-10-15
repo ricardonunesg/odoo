@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <data>
+        <record id="kits_mobile_push_notification_form_view" model="ir.ui.view">
+            <field name="name">kits.mobile.push.notification.form.view</field>
+            <field name="model">kits.mobile.push.notification</field>
+            <field name="arch" type="xml">
+                <form>
+                    <sheet>
+                        <group>
+                            <field name="hardware_id" />
+                            <field name="firebase_token" />
+                            <field name="partner_id" />
+                            <field name="user_login" />
+                            <field name="user_id" />
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+        <record id="kits_mobile_push_notification_list_view" model="ir.ui.view">
+            <field name="name">kits.mobile.push.notification.list.view.kits</field>
+            <field name="model">kits.mobile.push.notification</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="hardware_id" />
+                    <field name="firebase_token" />
+                    <field name="partner_id" />
+                    <field name="user_login" />
+                    <field name="user_id" />
+
+                </list>
+            </field>
+        </record>
+        <record id="action_kits_mobile_push_notification_view" model="ir.actions.act_window">
+            <field name="name">Mobile Push Notification</field>
+            <field name="res_model">kits.mobile.push.notification</field>
+            <field name="view_mode">list,form</field>
+        </record>
+    </data>
+</odoo>
