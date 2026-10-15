@@ -1,2 +1,3 @@
+from . import kits_mobile_push_notification
 from . import mail_message
-from . import project_task
+from . import mail_notification
