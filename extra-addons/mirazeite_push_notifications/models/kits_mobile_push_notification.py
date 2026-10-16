@@ -1,6 +1,6 @@
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 
 import pytz
@@ -40,7 +40,12 @@ class KitsMobilePushNotification(models.Model):
             return
         if not self.env.context.get('mirazeite_push_force') and self._mirazeite_is_quiet():
             # horário de silêncio: fica em espera e sai no fim do silêncio
-            self.env['mirazeite.push.pending'].sudo().create({
+            Pending = self.env['mirazeite.push.pending'].sudo()
+            if not Pending.search_count([], limit=1):
+                # primeiro da noite: marca o envio para a hora exacta em que o silêncio acaba
+                self.env.ref('mirazeite_push_notifications.ir_cron_push_send_pending').sudo()._trigger(
+                    at=self._mirazeite_quiet_end_utc())
+            Pending.create({
                 'user_ids': [(6, 0, list(notify_user_ids))],
                 'title': notification_title,
                 'body': notification_body,
@@ -181,14 +186,28 @@ class KitsMobilePushNotification(models.Model):
         return local_dt.hour >= start or local_dt.hour < end
 
     @api.model
+    def _mirazeite_quiet_end_utc(self):
+        """Hora (UTC, sem fuso) em que acaba o silêncio actual."""
+        local = datetime.now(pytz.utc).astimezone(TZ).replace(minute=0, second=0, microsecond=0)
+        for _i in range(24 * 7):
+            local = TZ.normalize(local + timedelta(hours=1))
+            if not self._mirazeite_is_quiet(local):
+                break
+        return local.astimezone(pytz.utc).replace(tzinfo=None)
+
+    @api.model
     def _mirazeite_cron_send_pending(self, limit=500):
-        """Corre de 5 em 5 minutos: fora do silêncio, envia os pushes em espera
-        pela ordem em que chegaram."""
+        """Corre à hora em que o silêncio acaba (marcada quando o primeiro push
+        fica em espera) e uma vez por dia por segurança. Envia os pushes em
+        espera pela ordem em que chegaram."""
         if self._mirazeite_is_quiet():
             return
-        pending = self.env['mirazeite.push.pending'].sudo().search([], order='id', limit=limit)
+        pending = self.env['mirazeite.push.pending'].sudo().search([], order='id', limit=limit + 1)
         if not pending:
             return
+        if len(pending) > limit:
+            pending = pending[:limit]
+            self.env.ref('mirazeite_push_notifications.ir_cron_push_send_pending').sudo()._trigger()
         Push = self.with_context(mirazeite_push_force=True)
         for item in pending:
             users = item.user_ids.filtered(lambda u: u.active)

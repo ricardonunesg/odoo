@@ -5,8 +5,10 @@
         <field name="model_id" ref="kits_mobile_push_notification.model_kits_mobile_push_notification"/>
         <field name="state">code</field>
         <field name="code">model._mirazeite_cron_send_pending()</field>
-        <field name="interval_number">5</field>
-        <field name="interval_type">minutes</field>
+        <!-- O envio é marcado (trigger) para a hora em que o silêncio acaba;
+             a corrida diária é só uma rede de segurança. -->
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
         <field name="active" eval="True"/>
     </record>
 </odoo>
