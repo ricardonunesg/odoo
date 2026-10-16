@@ -1,11 +1,11 @@
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 from types import SimpleNamespace
 
 import pytz
 
-from odoo import SUPERUSER_ID, api, fields, models
+from odoo import SUPERUSER_ID, api, models
 from odoo.http import _request_stack
 from odoo.tools import html2plaintext
 
@@ -14,7 +14,6 @@ _logger = logging.getLogger(__name__)
 POSTCOMMIT_KEY = 'mirazeite.push.queue'
 MAX_BODY = 240
 TZ = pytz.timezone('Europe/Lisbon')
-LAST_SUMMARY_KEY = 'mirazeite.push.last_summary'
 ASSIGNED_RE = re.compile(r'^(You have been assigned to|Você foi atribuído a|Foi atribuído a)\s+', re.I)
 
 
@@ -40,7 +39,14 @@ class KitsMobilePushNotification(models.Model):
         if self.env.context.get('mirazeite_push_skip') or not notify_user_ids:
             return
         if not self.env.context.get('mirazeite_push_force') and self._mirazeite_is_quiet():
-            # horário de silêncio: fica só na Caixa de entrada; resumo de manhã
+            # horário de silêncio: fica em espera e sai no fim do silêncio
+            self.env['mirazeite.push.pending'].sudo().create({
+                'user_ids': [(6, 0, list(notify_user_ids))],
+                'title': notification_title,
+                'body': notification_body,
+                'click_action': click_action or False,
+                'image_url': image_url or False,
+            })
             return
         tokens = self.sudo().search([
             ('user_id', 'in', list(notify_user_ids)),
@@ -153,7 +159,8 @@ class KitsMobilePushNotification(models.Model):
 
     # ------------------------------------------------------------------
     # Horário de silêncio (por defeito 21h–8h nos dias úteis e todo o fim
-    # de semana, hora de Lisboa) e resumo da manhã.
+    # de semana, hora de Lisboa). Os pushes ficam em espera e, no fim do
+    # silêncio, são todos enviados um a um.
     # ------------------------------------------------------------------
 
     @api.model
@@ -166,73 +173,31 @@ class KitsMobilePushNotification(models.Model):
         )
 
     @api.model
-    def _mirazeite_is_quiet(self, local_dt=None, config=None):
-        start, end, weekend = config or self._mirazeite_quiet_config()
+    def _mirazeite_is_quiet(self, local_dt=None):
+        start, end, weekend = self._mirazeite_quiet_config()
         local_dt = local_dt or datetime.now(pytz.utc).astimezone(TZ)
         if weekend and local_dt.weekday() >= 5:
             return True
         return local_dt.hour >= start or local_dt.hour < end
 
     @api.model
-    def _mirazeite_last_quiet_window(self, now_local):
-        """Devolve (início, fim) do último período de silêncio já terminado."""
-        config = self._mirazeite_quiet_config()
-        hour = timedelta(hours=1)
-        end = now_local.replace(minute=0, second=0, microsecond=0)
-        for _i in range(24 * 7):
-            if self._mirazeite_is_quiet(end - hour, config):
-                break
-            end -= hour
-        start = end
-        for _i in range(24 * 7):
-            if not self._mirazeite_is_quiet(start - hour, config):
-                break
-            start -= hour
-        return start, end
-
-    @api.model
-    def _mirazeite_cron_quiet_summary(self):
-        """Corre de hora a hora. Na primeira hora fora do silêncio, envia a cada
-        pessoa um único push com o número de avisos por ler que chegaram à
-        Caixa de entrada durante o silêncio."""
+    def _mirazeite_cron_send_pending(self, limit=500):
+        """Corre de 5 em 5 minutos: fora do silêncio, envia os pushes em espera
+        pela ordem em que chegaram."""
         if self._mirazeite_is_quiet():
             return
-        ICP = self.env['ir.config_parameter'].sudo()
-        now_local = datetime.now(pytz.utc).astimezone(TZ)
-        start_local, end_local = self._mirazeite_last_quiet_window(now_local)
-        start_utc = start_local.astimezone(pytz.utc).replace(tzinfo=None)
-        end_utc = end_local.astimezone(pytz.utc).replace(tzinfo=None)
-        last = ICP.get_param(LAST_SUMMARY_KEY)
-        if last and fields.Datetime.from_string(last) >= end_utc:
-            return  # já enviado para este período
-        ICP.set_param(LAST_SUMMARY_KEY, fields.Datetime.to_string(end_utc))
-
-        self.env.cr.execute("""
-            SELECT n.res_partner_id, count(*)
-              FROM mail_notification n
-              JOIN mail_message m ON m.id = n.mail_message_id
-             WHERE n.notification_type = 'inbox'
-               AND NOT n.is_read
-               AND m.create_date >= %s AND m.create_date < %s
-             GROUP BY n.res_partner_id
-        """, (start_utc, end_utc))
-        counts = dict(self.env.cr.fetchall())
-        if not counts:
+        pending = self.env['mirazeite.push.pending'].sudo().search([], order='id', limit=limit)
+        if not pending:
             return
-        base_url = ICP.get_param('web.base.url', '')
-        weekend = start_local.weekday() == 4 and (end_local - start_local) > timedelta(hours=24)
-        title = 'Avisos do fim de semana' if weekend else 'Avisos da noite'
         Push = self.with_context(mirazeite_push_force=True)
-        for partner in self.env['res.partner'].browse(list(counts)):
-            users = partner.user_ids.filtered(lambda u: u.active and not u.share)
-            if not users:
-                continue
-            n = counts[partner.id]
-            body = f'Tem {n} aviso novo na Caixa de entrada' if n == 1 else \
-                f'Tem {n} avisos novos na Caixa de entrada'
-            Push.send_push_notification_with_link(
-                notify_user_ids=users.ids,
-                notification_title=title,
-                notification_body=body,
-                click_action=f'{base_url}/odoo/discuss',
-            )
+        for item in pending:
+            users = item.user_ids.filtered(lambda u: u.active)
+            if users:
+                Push.send_push_notification_with_link(
+                    notify_user_ids=users.ids,
+                    notification_title=item.title,
+                    notification_body=item.body,
+                    click_action=item.click_action or False,
+                    image_url=item.image_url or False,
+                )
+        pending.unlink()
