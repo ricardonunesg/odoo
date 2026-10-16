@@ -488,7 +488,8 @@ class PrimaveraConnection(models.Model):
             if l.display_type or not l.product_id:
                 continue
             k = l.product_id.default_code or l.product_id.display_name
-            d = lines.setdefault(k, {"qty": 0.0, "prices": set()})
+            # compara-se pelo código; nos textos mostra-se a descrição (mais fácil de ler)
+            d = lines.setdefault(k, {"qty": 0.0, "prices": set(), "name": l.product_id.name or k})
             d["qty"] += l.product_uom_qty
             d["prices"].add(round(l.price_unit, 4))
         head = {"Data": so.date_order.date() if so.date_order else False}
@@ -502,16 +503,17 @@ class PrimaveraConnection(models.Model):
         bl, al = before["lines"], after["lines"]
         for k in sorted(set(bl) | set(al)):
             b, a = bl.get(k), al.get(k)
+            name = (a or b).get("name") or k
             if b and not a:
-                out.append(f"Linha removida: {k} — {self._fmt_num(b['qty'])}")
+                out.append(f"Linha removida: {name} — {self._fmt_num(b['qty'])}")
             elif a and not b:
-                out.append(f"Linha nova: {k} — {self._fmt_num(a['qty'])}")
+                out.append(f"Linha nova: {name} — {self._fmt_num(a['qty'])}")
             else:
                 if abs(a["qty"] - b["qty"]) > 0.0001:
-                    out.append(f"{k} — quantidade {self._fmt_num(b['qty'])} → {self._fmt_num(a['qty'])}")
+                    out.append(f"{name} — quantidade {self._fmt_num(b['qty'])} → {self._fmt_num(a['qty'])}")
                 if a["prices"] != b["prices"]:
                     fmt = lambda s: " / ".join(self._fmt_num(p, 2) for p in sorted(s))
-                    out.append(f"{k} — preço {fmt(b['prices'])} → {fmt(a['prices'])}")
+                    out.append(f"{name} — preço {fmt(b['prices'])} → {fmt(a['prices'])}")
         for label, bv in before["head"].items():
             av = after["head"].get(label)
             if (bv or "") != (av or ""):
@@ -541,7 +543,7 @@ class PrimaveraConnection(models.Model):
         """Notificação de ECL nova (acrescentada à fase 1 a 14/10/2026)."""
         linhas = so.order_line.filtered(lambda l: l.product_id and not l.display_type)
         detalhe = "".join(
-            f"<li>{html.escape(l.product_id.default_code or l.product_id.display_name)} — "
+            f"<li>{html.escape(l.product_id.name or l.product_id.default_code or '')} — "
             f"{self._fmt_num(l.product_uom_qty)}</li>"
             for l in linhas[:15]
         )
