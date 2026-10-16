@@ -18,7 +18,9 @@ ASSIGNED_RE = re.compile(r'^(You have been assigned to|Você foi atribuído a|Fo
 
 
 def _clean_text(html):
-    text = html2plaintext(html or '')
+    # itens de lista separados por "; " (o html2plaintext cola-os uns aos outros)
+    html = re.sub(r'</li>\s*<li[^>]*>', '; ', str(html or ''))
+    text = html2plaintext(html)
     # html2plaintext põe os links como "texto [1]" + lista "[1] url" no fim
     text = re.sub(r'^\s*\[\d+\]\s+\S+\s*$', '', text, flags=re.M)
     text = re.sub(r'\s*\[\d+\]', '', text)
@@ -144,13 +146,15 @@ class KitsMobilePushNotification(models.Model):
             title = record.display_name if record else False
         title = title or message.subject or 'Odoo'
 
-        if message.message_type == 'user_notification' and message.subject:
-            # atribuições ("You have been assigned to …"), atividades, etc.
-            subject = message.subject
-            if ASSIGNED_RE.match(subject):
-                subject = 'Foi-lhe atribuída: ' + ASSIGNED_RE.sub('', subject)
-            return title, _clean_text(subject)
+        if message.message_type == 'user_notification' and message.subject and ASSIGNED_RE.match(message.subject):
+            # atribuição de tarefa: o corpo é um texto-modelo longo ("Dear …"), o assunto diz tudo
+            return title, _clean_text('Foi-lhe atribuída: ' + ASSIGNED_RE.sub('', message.subject))
 
+        if message.message_type == 'user_notification' and message.subject:
+            # avisos directos (ECL, alertas…): o assunto é o melhor título (ex.: "ECL/2026/505 — CLIENTE")
+            title = message.subject
+
+        # restantes avisos (ECL, alertas, atividades, mensagens): o conteúdo está no corpo
         text = _clean_text(message.body)
         if not text and message.tracking_value_ids:
             changes = message.sudo().tracking_value_ids._tracking_value_format()
