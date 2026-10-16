@@ -1,6 +1,6 @@
 {
     'name': 'Mirazeite Push Notifications',
-    'version': '18.0.1.1.1',
+    'version': '18.0.1.1.2',
     'category': 'Technical',
     'summary': 'Push para a app de telemóvel de tudo o que chega à Caixa de entrada do Discuss',
     'depends': ['kits_mobile_push_notification', 'mail'],

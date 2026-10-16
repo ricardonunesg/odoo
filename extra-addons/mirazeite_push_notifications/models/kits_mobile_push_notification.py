@@ -12,7 +12,7 @@ from odoo.tools import html2plaintext
 _logger = logging.getLogger(__name__)
 
 POSTCOMMIT_KEY = 'mirazeite.push.queue'
-MAX_BODY = 240
+MAX_BODY = 500
 TZ = pytz.timezone('Europe/Lisbon')
 ASSIGNED_RE = re.compile(r'^(You have been assigned to|Você foi atribuído a|Foi atribuído a)\s+', re.I)
 
