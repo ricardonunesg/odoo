@@ -38,6 +38,15 @@ class KitsMobilePushNotification(models.Model):
         põe o push numa fila que só é enviada depois do commit."""
         if self.env.context.get('mirazeite_push_skip') or not notify_user_ids:
             return
+        if not notification_title or not notification_body:
+            return
+        devices = self.sudo().search([
+            ('user_id', 'in', list(notify_user_ids)),
+            ('user_login', '=', True),
+            ('firebase_token', '!=', False),
+        ])
+        if not devices:
+            return  # ninguém com a app ligada
         if not self.env.context.get('mirazeite_push_force') and self._mirazeite_is_quiet():
             # horário de silêncio: fica em espera e sai no fim do silêncio
             Pending = self.env['mirazeite.push.pending'].sudo()
@@ -46,20 +55,14 @@ class KitsMobilePushNotification(models.Model):
                 self.env.ref('mirazeite_push_notifications.ir_cron_push_send_pending').sudo()._trigger(
                     at=self._mirazeite_quiet_end_utc())
             Pending.create({
-                'user_ids': [(6, 0, list(notify_user_ids))],
+                'user_ids': [(6, 0, devices.user_id.ids)],
                 'title': notification_title,
                 'body': notification_body,
                 'click_action': click_action or False,
                 'image_url': image_url or False,
             })
             return
-        tokens = self.sudo().search([
-            ('user_id', 'in', list(notify_user_ids)),
-            ('user_login', '=', True),
-            ('firebase_token', '!=', False),
-        ]).mapped('firebase_token')
-        if not tokens or not notification_title or not notification_body:
-            return
+        tokens = devices.mapped('firebase_token')
         cr = self.env.cr
         queue = cr.postcommit.data.setdefault(POSTCOMMIT_KEY, [])
         if not queue:
