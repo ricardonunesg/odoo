@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_primavera_supplier_name" model="ir.ui.view">
+        <field name="name">res.partner.form.primavera.supplier.name</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="primavera_connector.view_partner_form_primavera_connector"/>
+        <field name="arch" type="xml">
+            <field name="primavera_supplier_code" position="after">
+                <field name="primavera_supplier_name" invisible="not primavera_supplier_name"/>
+            </field>
+        </field>
+    </record>
+</odoo>

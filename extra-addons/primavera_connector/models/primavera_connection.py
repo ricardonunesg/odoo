@@ -1655,7 +1655,14 @@ class PrimaveraConnection(models.Model):
                 if partner_type == "supplier" and partner.primavera_customer_code:
                     # Cliente que também é fornecedor: os dados do cliente mandam
                     # (nome, morada, telefone, ref…); aqui só se marca como fornecedor.
+                    supplier_name = vals.get("name")
                     vals = {k: vals[k] for k in (code_field, rank_field, "category_id") if k in vals}
+                    # Nome de fornecedor guardado à parte, para a pesquisa o encontrar
+                    # (campo do módulo mirazeite_partner_search).
+                    if "primavera_supplier_name" in partner._fields:
+                        vals["primavera_supplier_name"] = (
+                            supplier_name if supplier_name != partner.name else False
+                        )
                 self._safe_write_partner(partner, vals)
                 stats["updated"] += 1
             else:
