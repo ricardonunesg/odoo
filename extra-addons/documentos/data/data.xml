@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<odoo>
+<odoo noupdate="1">
 
     <!-- Sequências para todos os documentos -->
     <record id="seq_packing_list" model="ir.sequence">
