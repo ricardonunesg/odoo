@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Sequências para todos os documentos -->
+    <record id="seq_packing_list" model="ir.sequence">
+        <field name="name">Packing List</field>
+        <field name="code">packing.list</field>
+        <field name="prefix">PL/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <record id="seq_declaracao_lote" model="ir.sequence">
+        <field name="name">Declaração de Lote</field>
+        <field name="code">declaracao.lote</field>
+        <field name="prefix">DL/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <record id="seq_certificado_salubridade" model="ir.sequence">
+        <field name="name">Certificado de Salubridade</field>
+        <field name="code">certificado.salubridade</field>
+        <field name="prefix">CS/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <record id="seq_certificado_qualidade" model="ir.sequence">
+        <field name="name">Certificado de Qualidade</field>
+        <field name="code">certificado.qualidade</field>
+        <field name="prefix">CQ/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <record id="seq_boletim_analises" model="ir.sequence">
+        <field name="name">Boletim de Análises</field>
+        <field name="code">boletim.analises</field>
+        <field name="prefix">BA/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <!-- Moradas internas -->
+    <record id="morada_arruda" model="documento.morada">
+        <field name="name">Arruda dos Vinhos</field>
+        <field name="street">Rua da Cooperativa Agrícola, Nº 1</field>
+        <field name="zip">2630-017</field>
+        <field name="city">Arruda dos Vinhos</field>
+        <field name="country_id" ref="base.pt"/>
+    </record>
+
+    <record id="morada_tomar" model="documento.morada">
+        <field name="name">Tomar</field>
+        <field name="street">Rua de Tomar, Nº 1</field>
+        <field name="zip">2300-000</field>
+        <field name="city">Tomar</field>
+        <field name="country_id" ref="base.pt"/>
+    </record>
+
+    <!-- Modelo Standard de Packing List -->
+    <record id="template_standard" model="packing.list.template">
+        <field name="name">Standard</field>
+        <field name="sequence">10</field>
+        <field name="default_morada_id" ref="morada_arruda"/>
+    </record>
+
+    <!-- Templates padrão para os 4 novos documentos -->
+    <record id="template_standard_declaracao_lote" model="declaracao.lote.template">
+        <field name="name">Standard</field>
+        <field name="sequence">10</field>
+        <field name="default_morada_id" ref="morada_arruda"/>
+    </record>
+    <record id="template_standard_certificado_salubridade" model="certificado.salubridade.template">
+        <field name="name">Standard</field>
+        <field name="sequence">10</field>
+        <field name="default_morada_id" ref="morada_arruda"/>
+    </record>
+    <record id="template_standard_certificado_qualidade" model="certificado.qualidade.template">
+        <field name="name">Standard</field>
+        <field name="sequence">10</field>
+        <field name="default_morada_id" ref="morada_arruda"/>
+    </record>
+    <record id="template_standard_boletim_analises" model="boletim.analises.template">
+        <field name="name">Standard</field>
+        <field name="sequence">10</field>
+        <field name="default_morada_id" ref="morada_arruda"/>
+    </record>
+
+    <!-- Morada Mirazeite-Tomar (Edifício Caçabrava, Asseiceira) -->
+    <record id="morada_tomar_cacabrava" model="documento.morada">
+        <field name="name">Mirazeite-Tomar</field>
+        <field name="street">Edifício Caçabrava</field>
+        <field name="city">Asseiceira</field>
+        <field name="country_id" ref="base.pt"/>
+    </record>
+
+    <!-- Sequência Certificado de Conformidade Alimentar -->
+    <record id="seq_certificado_conformidade_alimentar" model="ir.sequence">
+        <field name="name">Certificado de Conformidade Alimentar</field>
+        <field name="code">certificado.conformidade.alimentar</field>
+        <field name="prefix">CCA/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <!-- Template padrão Conformidade Alimentar -->
+    <record id="template_conformidade_standard" model="certificado.conformidade.alimentar.template">
+        <field name="name">Standard</field>
+        <field name="sequence">10</field>
+        <field name="morada_padrao_id" ref="morada_tomar_cacabrava"/>
+        <field name="local_assinatura_padrao">Tomar</field>
+    </record>
+
+    <!-- Sequências certificados narrativos -->
+    <record id="seq_certificado_salubridade" model="ir.sequence">
+        <field name="name">Certificado de Salubridade</field>
+        <field name="code">certificado.salubridade</field>
+        <field name="prefix">CS/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+    <record id="seq_certificado_qualidade_narrativo" model="ir.sequence">
+        <field name="name">Certificado de Qualidade (Narrativo)</field>
+        <field name="code">certificado.qualidade</field>
+        <field name="prefix">QC/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+    <!-- Presets organoléticos -->
+    <record id="preset_azeite_virgem_extra" model="certificado.organoletica.preset">
+        <field name="name">Azeite Virgem Extra</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="preset_azeite_virgem_extra_l1" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeite_virgem_extra"/>
+        <field name="sequence">10</field>
+        <field name="caracteristica">Color</field>
+        <field name="valor">Greenish yellow</field>
+    </record>
+    <record id="preset_azeite_virgem_extra_l2" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeite_virgem_extra"/>
+        <field name="sequence">20</field>
+        <field name="caracteristica">Smell</field>
+        <field name="valor">Soft and frutty</field>
+    </record>
+    <record id="preset_azeite_virgem_extra_l3" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeite_virgem_extra"/>
+        <field name="sequence">30</field>
+        <field name="caracteristica">Flavor</field>
+        <field name="valor">Sweet</field>
+    </record>
+
+    <record id="preset_azeite_pt" model="certificado.organoletica.preset">
+        <field name="name">Azeite (PT)</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="preset_azeite_pt_l1" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeite_pt"/>
+        <field name="sequence">10</field>
+        <field name="caracteristica">Aspeto</field>
+        <field name="valor">Líquido oleoso, límpido e s/ depósito</field>
+    </record>
+    <record id="preset_azeite_pt_l2" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeite_pt"/>
+        <field name="sequence">20</field>
+        <field name="caracteristica">Cor</field>
+        <field name="valor">Amarelo Dourado</field>
+    </record>
+    <record id="preset_azeite_pt_l3" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeite_pt"/>
+        <field name="sequence">30</field>
+        <field name="caracteristica">Cheiro</field>
+        <field name="valor">Medianamente Frutado</field>
+    </record>
+    <record id="preset_azeite_pt_l4" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeite_pt"/>
+        <field name="sequence">40</field>
+        <field name="caracteristica">Sabor</field>
+        <field name="valor">Ligeiramente amargo</field>
+    </record>
+
+    <record id="preset_azeite_refinado" model="certificado.organoletica.preset">
+        <field name="name">Azeite Refinado (EN)</field>
+        <field name="sequence">30</field>
+    </record>
+    <record id="preset_azeite_refinado_l1" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeite_refinado"/>
+        <field name="sequence">10</field>
+        <field name="caracteristica">Appearance</field>
+        <field name="valor">Clear liquid without deposit</field>
+    </record>
+    <record id="preset_azeite_refinado_l2" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeite_refinado"/>
+        <field name="sequence">20</field>
+        <field name="caracteristica">Color</field>
+        <field name="valor">Light yellow</field>
+    </record>
+    <record id="preset_azeite_refinado_l3" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeite_refinado"/>
+        <field name="sequence">30</field>
+        <field name="caracteristica">Smell</field>
+        <field name="valor">Neutral</field>
+    </record>
+    <record id="preset_azeite_refinado_l4" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeite_refinado"/>
+        <field name="sequence">40</field>
+        <field name="caracteristica">Flavor</field>
+        <field name="valor">Mild</field>
+    </record>
+
+    <record id="preset_azeitona_preta" model="certificado.organoletica.preset">
+        <field name="name">Azeitona Preta (EN)</field>
+        <field name="sequence">40</field>
+    </record>
+    <record id="preset_azeitona_preta_l1" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeitona_preta"/>
+        <field name="sequence">10</field>
+        <field name="caracteristica">Color</field>
+        <field name="valor">Bright black</field>
+    </record>
+    <record id="preset_azeitona_preta_l2" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeitona_preta"/>
+        <field name="sequence">20</field>
+        <field name="caracteristica">Shape</field>
+        <field name="valor">Rounded oval</field>
+    </record>
+    <record id="preset_azeitona_preta_l3" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeitona_preta"/>
+        <field name="sequence">30</field>
+        <field name="caracteristica">Consistency</field>
+        <field name="valor">Firm</field>
+    </record>
+    <record id="preset_azeitona_preta_l4" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeitona_preta"/>
+        <field name="sequence">40</field>
+        <field name="caracteristica">Flavor</field>
+        <field name="valor">Suis generis</field>
+    </record>
+
+    <record id="preset_azeitona_verde" model="certificado.organoletica.preset">
+        <field name="name">Azeitona Verde (EN)</field>
+        <field name="sequence">50</field>
+    </record>
+    <record id="preset_azeitona_verde_l1" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeitona_verde"/>
+        <field name="sequence">10</field>
+        <field name="caracteristica">Color</field>
+        <field name="valor">Skin and pulp green</field>
+    </record>
+    <record id="preset_azeitona_verde_l2" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeitona_verde"/>
+        <field name="sequence">20</field>
+        <field name="caracteristica">Shape</field>
+        <field name="valor">Rounded oval</field>
+    </record>
+    <record id="preset_azeitona_verde_l3" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeitona_verde"/>
+        <field name="sequence">30</field>
+        <field name="caracteristica">Consistency</field>
+        <field name="valor">Firm skin and soft pulp</field>
+    </record>
+    <record id="preset_azeitona_verde_l4" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_azeitona_verde"/>
+        <field name="sequence">40</field>
+        <field name="caracteristica">Flavor</field>
+        <field name="valor">Suis generis</field>
+    </record>
+
+    <record id="preset_tempero" model="certificado.organoletica.preset">
+        <field name="name">Tempero Alimentar (EN)</field>
+        <field name="sequence">60</field>
+    </record>
+    <record id="preset_tempero_l1" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_tempero"/>
+        <field name="sequence">10</field>
+        <field name="caracteristica">Appearance</field>
+        <field name="valor">Clear liquid without deposit</field>
+    </record>
+    <record id="preset_tempero_l2" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_tempero"/>
+        <field name="sequence">20</field>
+        <field name="caracteristica">Color</field>
+        <field name="valor">Yellow Greenish</field>
+    </record>
+    <record id="preset_tempero_l3" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_tempero"/>
+        <field name="sequence">30</field>
+        <field name="caracteristica">Smell</field>
+        <field name="valor">Soft</field>
+    </record>
+    <record id="preset_tempero_l4" model="certificado.organoletica.preset.linha">
+        <field name="preset_id" ref="preset_tempero"/>
+        <field name="sequence">40</field>
+        <field name="caracteristica">Flavor</field>
+        <field name="valor">Soft</field>
+    </record>
+
+    <!-- Templates padrão certificados narrativos -->
+    <record id="template_salubridade_standard" model="certificado.salubridade.template">
+        <field name="name">Standard PT</field>
+        <field name="sequence">10</field>
+        <field name="default_morada_id" ref="morada_arruda"/>
+        <field name="preset_id" ref="preset_azeite_pt"/>
+        <field name="in_english" eval="False"/>
+    </record>
+    <record id="template_qualidade_standard" model="certificado.qualidade.template">
+        <field name="name">Standard EN</field>
+        <field name="sequence">10</field>
+        <field name="default_morada_id" ref="morada_arruda"/>
+        <field name="preset_id" ref="preset_azeite_virgem_extra"/>
+        <field name="in_english" eval="True"/>
+        <field name="show_tabela_identificacao" eval="False"/>
+    </record>
+
+</odoo>
