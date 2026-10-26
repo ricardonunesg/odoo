@@ -11,6 +11,7 @@ from dateutil.relativedelta import relativedelta
 from markupsafe import Markup
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
+from odoo.tools import float_compare, html2plaintext
 
 SYNC_FAILURE_ALERT_EMAIL = "goncalo.simoes@mirazeite.com"
 
@@ -250,8 +251,10 @@ class PrimaveraConnection(models.Model):
 
     def action_import_products(self):
         self.ensure_one()
-        # Artigos sem endpoint de listagem: descobrir via ECLs importadas
-        stats = self._sync_products_from_ecls()
+        stats = self._sync_products_from_sql(full=True)
+        if stats is None:
+            raise UserError(_("Sem ligação ao SQL Server do Primavera: os artigos vêm de lá."))
+        self._log("products", "success", "[completo] " + self._stats_msg(stats))
         return self._notify(_("Artigos importados"), self._stats_msg(stats))
 
     def action_import_ecls(self):
@@ -1050,8 +1053,8 @@ class PrimaveraConnection(models.Model):
                 stats = self._import_faturas()
                 messages.append(_("Faturas: %s") % self._stats_msg(stats))
             if self.sync_products:
-                stats = self._sync_products_from_ecls()
-                messages.append(_("Artigos: %s") % self._stats_msg(stats))
+                stats = self._sync_products_from_sql(full=True)
+                messages.append(_("Artigos: %s") % (self._stats_msg(stats) if stats else _("sem ligação SQL")))
             if self.sync_employees:
                 try:
                     stats = self._import_employees()
@@ -1219,11 +1222,14 @@ class PrimaveraConnection(models.Model):
     def cron_import_products_only(self):
         for conn in self.search([("active", "=", True), ("sync_products", "=", True)]):
             try:
-                stats = conn._sync_products_from_ecls()
-                conn._log("products", "success", conn._stats_msg(stats))
+                stats, mode = conn._run_product_sync()
+                # Sem SQL não há nada a fazer (o alerta de SQL em baixo já existe);
+                # o incremental só fica no log quando muda alguma coisa.
+                if stats and (mode != _("incremental") or stats["created"] or stats["updated"]):
+                    conn._log("products", "success", f"[{mode}] {conn._stats_msg(stats)}")
             except Exception as exc:
                 conn._log("products", "error", str(exc))
-                conn._send_sync_failure_alert("artigos (via ECLs)", exc)
+                conn._send_sync_failure_alert("artigos", exc)
 
     @api.model
     def cron_import_employees_only(self):
@@ -2399,81 +2405,158 @@ class PrimaveraConnection(models.Model):
         return stats
 
     # ─────────────────────────────────────────────────────────────────────
-    # IMPORTAÇÃO DE ARTIGOS (a partir das ECLs existentes)
+    # IMPORTAÇÃO DE ARTIGOS (SQL do Primavera, só leitura)
     # ─────────────────────────────────────────────────────────────────────
 
-    def _sync_products_from_ecls(self):
-        """Importa artigos referenciados nas ECLs (Primavera não tem endpoint de listagem)."""
+    # Desde 26/10/2026 os artigos vêm directamente da tabela Artigo do Primavera
+    # (só SELECT): a WebAPI não tem listagem e varrer as ECLs só apanhava os
+    # artigos vendidos. Incremental pelo contador VersaoUltAct (muda com qualquer
+    # alteração ao artigo, incluindo anulação) e volta completa uma vez por dia a
+    # partir das 02:00 (hora de Lisboa). Só grava o que estiver diferente; nunca
+    # apaga (anulado no Primavera → arquivado no Odoo). Sem SQL não faz nada.
+    _PRODUCT_FULL_SYNC_HOUR = 2
+    _PRODUCT_SKIP_CODES = {"TESTE57"}  # artigo de teste do Primavera (decisão do user)
+    _PRODUCT_SQL_COLUMNS = (
+        "Artigo, Descricao, ArtigoAnulado, UnidadeBase, UnidadeVenda, UnidadeCompra, "
+        "Peso, Volume, CodBarras, Observacoes"
+    )
+
+    def _product_sync_key(self, name):
+        return f"primavera_connector.product_sync.{self.id}.{name}"
+
+    def _fetch_sql_products(self, since_hex=None):
+        """(linhas da tabela Artigo como dicts, versão actual em hex), só os
+        alterados depois de `since_hex` se for dado. None sem SQL. Só leitura."""
+        sql_conn = self._sql_connection()
+        if not sql_conn:
+            return None
+        try:
+            with sql_conn.cursor() as cur:
+                # Versão lida ANTES dos artigos: uma alteração feita entretanto
+                # volta a ser apanhada na execução seguinte.
+                cur.execute("SELECT @@DBTS")
+                new_ver = bytes(cur.fetchone()[0]).hex()
+                query = f"SELECT {self._PRODUCT_SQL_COLUMNS} FROM Artigo"
+                params = ()
+                if since_hex:
+                    query += " WHERE VersaoUltAct > %s"
+                    params = (bytes.fromhex(since_hex),)
+                cur.execute(query, params)
+                cols = [d[0] for d in cur.description]
+                rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+            return rows, new_ver
+        finally:
+            sql_conn.close()
+
+    def _product_vals_from_sql(self, row, product):
+        code = self._clean(row["Artigo"])
+        uom_venda = self._get_or_create_uom(row["UnidadeVenda"] or row["UnidadeBase"])
+        uom_compra = self._get_or_create_uom(row["UnidadeCompra"] or row["UnidadeBase"])
+        vals = {
+            "name": self._clean(row["Descricao"]),
+            "default_code": code,
+            "primavera_code": code,
+            "active": not row["ArtigoAnulado"],
+            "weight": row["Peso"] or 0.0,
+            "volume": row["Volume"] or 0.0,
+        }
+        if uom_venda:
+            vals["uom_id"] = uom_venda.id
+            # O Odoo exige compra e venda na mesma categoria (ex.: MP.* vendem-se
+            # em LT e compram-se em KG no Primavera) — nesse caso compra = venda.
+            if not uom_compra or uom_compra.category_id != uom_venda.category_id:
+                uom_compra = uom_venda
+            vals["uom_po_id"] = uom_compra.id
+        barcode = self._clean(row["CodBarras"])
+        if barcode and self._barcode_available(barcode, product):
+            vals["barcode"] = barcode
+        observations = self._clean(row["Observacoes"])
+        if observations:
+            vals["description"] = observations
+        return vals
+
+    @staticmethod
+    def _product_changed_vals(product, vals):
+        """Só os campos que mudam (compara com a precisão do próprio campo)."""
+        changed = {}
+        for fname, value in vals.items():
+            field = product._fields[fname]
+            current = product[fname]
+            if field.type == "many2one":
+                current = current.id
+            elif field.type == "float":
+                if float_compare(current or 0.0, value or 0.0, precision_digits=field.get_digits(product.env)[1]) == 0:
+                    continue
+            elif fname == "description":
+                current = html2plaintext(current or "").strip()
+            if field.type != "float" and (current or False) == (value or False):
+                continue
+            changed[fname] = value
+        return changed
+
+    def _sync_products_from_sql(self, full=True):
+        """Importa/actualiza artigos a partir do SQL do Primavera. Devolve stats
+        ou None se o SQL não estiver disponível."""
         self.ensure_one()
+        ICP = self.env["ir.config_parameter"].sudo()
+        k_ver = self._product_sync_key("version")
+        since = None if full else ICP.get_param(k_ver)
+        fetched = self._fetch_sql_products(since)
+        if fetched is None:
+            return None
+        rows, new_ver = fetched
+
         stats = {"created": 0, "updated": 0, "skipped": 0}
-
-        if "export.ecl" not in self.env:
-            return stats
-
-        Product = self.env["product.template"].sudo().with_context(active_test=False)
-        serie = self.ecl_serie or "2026"
-        filial = self.api_filial or "000"
-
-        # Recolher códigos de artigo das ECLs da série actual
-        codes_seen = set()
-        for num in range(1, (self.ecl_last_imported_num or 0) + 1):
-            ep = f"/v2/Vendas/Docs/Edita/{filial}/ECL/{serie}/{num}"
-            data = self._edita(ep)
-            if not data:
-                continue
-            for linha in data.get("Linhas") or []:
-                code = self._clean(linha.get("Artigo"))
-                if code:
-                    codes_seen.add(code)
-
-        for code in codes_seen:
-            art_data = self._edita(f"/v2/Base/Artigos/Edita/{code}")
-            if not art_data:
+        Product = self.env["product.template"].sudo().with_context(active_test=False, lang="en_US")
+        codes = [self._clean(r["Artigo"]) for r in rows]
+        existing = {p.primavera_code: p for p in Product.search([("primavera_code", "in", codes)])}
+        errors = []
+        for row in rows:
+            code = self._clean(row["Artigo"])
+            if not code or code in self._PRODUCT_SKIP_CODES or not self._clean(row["Descricao"]):
                 stats["skipped"] += 1
                 continue
-
-            name = self._clean(art_data.get("Descricao"))
-            if not name:
+            product = existing.get(code)
+            try:
+                with self.env.cr.savepoint():
+                    vals = self._product_vals_from_sql(row, product)
+                    if product:
+                        changed = self._product_changed_vals(product, vals)
+                        if changed:
+                            product.write(changed)
+                            stats["updated"] += 1
+                    else:
+                        vals.update({"sale_ok": True, "purchase_ok": True})
+                        Product.create(vals)
+                        stats["created"] += 1
+            except Exception as exc:
                 stats["skipped"] += 1
-                continue
-
-            product = Product.search([("primavera_code", "=", code)], limit=1)
-            uom_venda = self._get_or_create_uom(art_data.get("UnidadeVenda") or art_data.get("UnidadeBase"))
-            uom_compra = self._get_or_create_uom(art_data.get("UnidadeCompra") or art_data.get("UnidadeBase"))
-
-            vals = {
-                "name": name,
-                "default_code": code,
-                "primavera_code": code,
-                "active": not bool(art_data.get("ArtigoAnulado")),
-                "sale_ok": True,
-                "purchase_ok": True,
-                "weight": art_data.get("Peso") or 0.0,
-                "volume": art_data.get("Volume") or 0.0,
-            }
-            if uom_venda:
-                vals["uom_id"] = uom_venda.id
-                if not uom_compra or uom_compra == uom_venda:
-                    vals["uom_po_id"] = uom_venda.id
-            if uom_compra and uom_compra != uom_venda:
-                vals["uom_po_id"] = uom_compra.id
-            barcode = self._clean(art_data.get("CodBarras"))
-            if barcode and self._barcode_available(barcode, product):
-                vals["barcode"] = barcode
-
-            observations = self._clean(art_data.get("Observacoes"))
-            if observations:
-                vals["description"] = observations
-
-            if product:
-                product.write(vals)
-                stats["updated"] += 1
-            else:
-                Product.create(vals)
-                stats["created"] += 1
-
-        self._log("products", "success", self._stats_msg(stats))
+                errors.append(f"{code}: {exc}")
+        ICP.set_param(k_ver, new_ver)
+        if full:
+            ICP.set_param(self._product_sync_key("last_full"), fields.Datetime.to_string(fields.Datetime.now()))
+        if errors:
+            self._log("products", "error", _("Artigos com erro (%s): %s") % (len(errors), "; ".join(errors[:20])))
         return stats
+
+    def _run_product_sync(self):
+        """Escolhe entre volta completa e incremental. Devolve (stats, modo) ou
+        (None, None) se o SQL não estiver disponível."""
+        self.ensure_one()
+        ICP = self.env["ir.config_parameter"].sudo()
+        last_full = ICP.get_param(self._product_sync_key("last_full"))
+        lisboa = datetime.now(ZoneInfo("Europe/Lisbon"))
+        last_full_lisboa = (
+            fields.Datetime.from_string(last_full).replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo("Europe/Lisbon"))
+            if last_full else None
+        )
+        full = (
+            not ICP.get_param(self._product_sync_key("version"))
+            or not last_full_lisboa
+            or (last_full_lisboa.date() < lisboa.date() and lisboa.hour >= self._PRODUCT_FULL_SYNC_HOUR)
+        )
+        stats = self._sync_products_from_sql(full=full)
+        return stats, (_("completo") if full else _("incremental"))
 
     # ─────────────────────────────────────────────────────────────────────
     # UNIDADES DE MEDIDA
