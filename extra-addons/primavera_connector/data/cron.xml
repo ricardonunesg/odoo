@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- noupdate (27/10/2026): uma actualização do módulo (-u) não repõe estes
+         crons (activo, intervalo, próxima execução) — são geridos no ecrã. Só
+         são criados a partir daqui se ainda não existirem. -->
+    <data noupdate="1">
     <!-- Sync completo (clientes, fornecedores, artigos, faturas) — 1x por dia -->
     <record id="ir_cron_primavera_sync" model="ir.cron">
         <field name="name">Primavera: sincronizar clientes, fornecedores, artigos e ECLs</field>
@@ -142,6 +146,8 @@
         <field name="nextcall">2026-10-01 08:00:00</field>
         <field name="active">True</field>
     </record>
+
+    </data>
 
     <!-- Validações semanais — sábado às 07:00 UTC (08:00 Lisboa no verão), semana
          de sábado a sexta anteriores, só para o Gonçalo. noupdate: upgrades não
