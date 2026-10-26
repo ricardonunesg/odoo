@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<odoo noupdate="1">
+<odoo>
 
+    <!-- noupdate (27/10/2026): uma actualização do módulo não repõe as numerações
+         (o contador voltaria a 1 → números repetidos). Os modelos, moradas e presets
+         abaixo continuam a ser actualizados pelos ficheiros. -->
+    <data noupdate="1">
     <!-- Sequências para todos os documentos -->
     <record id="seq_packing_list" model="ir.sequence">
         <field name="name">Packing List</field>
@@ -46,6 +50,7 @@
         <field name="number_next">1</field>
         <field name="number_increment">1</field>
     </record>
+    </data>
 
     <!-- Moradas internas -->
     <record id="morada_arruda" model="documento.morada">
@@ -101,7 +106,8 @@
         <field name="country_id" ref="base.pt"/>
     </record>
 
-    <!-- Sequência Certificado de Conformidade Alimentar -->
+    <!-- Sequência Certificado de Conformidade Alimentar (noupdate, ver acima) -->
+    <data noupdate="1">
     <record id="seq_certificado_conformidade_alimentar" model="ir.sequence">
         <field name="name">Certificado de Conformidade Alimentar</field>
         <field name="code">certificado.conformidade.alimentar</field>
@@ -110,6 +116,7 @@
         <field name="number_next">1</field>
         <field name="number_increment">1</field>
     </record>
+    </data>
 
     <!-- Template padrão Conformidade Alimentar -->
     <record id="template_conformidade_standard" model="certificado.conformidade.alimentar.template">
@@ -119,7 +126,8 @@
         <field name="local_assinatura_padrao">Tomar</field>
     </record>
 
-    <!-- Sequências certificados narrativos -->
+    <!-- Sequências certificados narrativos (noupdate, ver acima) -->
+    <data noupdate="1">
     <record id="seq_certificado_salubridade" model="ir.sequence">
         <field name="name">Certificado de Salubridade</field>
         <field name="code">certificado.salubridade</field>
@@ -136,6 +144,7 @@
         <field name="number_next">1</field>
         <field name="number_increment">1</field>
     </record>
+    </data>
     <!-- Presets organoléticos -->
     <record id="preset_azeite_virgem_extra" model="certificado.organoletica.preset">
         <field name="name">Azeite Virgem Extra</field>
