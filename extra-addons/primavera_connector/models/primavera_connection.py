@@ -2537,7 +2537,41 @@ class PrimaveraConnection(models.Model):
             ICP.set_param(self._product_sync_key("last_full"), fields.Datetime.to_string(fields.Datetime.now()))
         if errors:
             self._log("products", "error", _("Artigos com erro (%s): %s") % (len(errors), "; ".join(errors[:20])))
+            self._send_product_errors_alert(errors)
         return stats
+
+    _PRODUCT_ALERT_EMAILS = ["goncalo.simoes@mirazeite.com", "pedro.santos@mirazeite.com"]
+
+    def _send_product_errors_alert(self, errors):
+        """Email com os artigos que não foi possível gravar. Máximo 1 por dia
+        (data de Lisboa, flag em ir.config_parameter); o resto fica nos Logs."""
+        try:
+            ICP = self.env["ir.config_parameter"].sudo()
+            key = self._product_sync_key("last_error_alert")
+            today = datetime.now(ZoneInfo("Europe/Lisbon")).date().isoformat()
+            if ICP.get_param(key) == today:
+                return
+            ICP.set_param(key, today)
+            items = "".join(f"<li>{html.escape(e)}</li>" for e in errors[:50])
+            mais = f"<p>… e mais {len(errors) - 50}.</p>" if len(errors) > 50 else ""
+            body = (
+                f"<p>Na sincronização de artigos do Primavera, <b>{len(errors)} artigo(s)</b> não "
+                f"foram criados/actualizados no Odoo:</p><ul>{items}</ul>{mais}"
+                f"<p>Os restantes artigos foram sincronizados normalmente. Detalhes em Odoo → "
+                f"Primavera → Logs (operação Artigos, estado Erro).</p>"
+                f"<p><i>Este aviso é enviado no máximo uma vez por dia.</i></p>"
+            )
+            Mail = self.env["mail.mail"].sudo()
+            for email in self._PRODUCT_ALERT_EMAILS:
+                Mail.create({
+                    "subject": f"[Primavera] {len(errors)} artigo(s) com erro na sincronização",
+                    "body_html": body,
+                    "email_to": email,
+                    "auto_delete": True,
+                }).send()
+        except Exception:
+            # O email não pode impedir a sincronização dos restantes artigos
+            pass
 
     def _run_product_sync(self):
         """Escolhe entre volta completa e incremental. Devolve (stats, modo) ou
