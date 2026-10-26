@@ -16,6 +16,11 @@ from odoo.tools import float_compare, html2plaintext
 SYNC_FAILURE_ALERT_EMAIL = "goncalo.simoes@mirazeite.com"
 
 
+class PrimaveraApiError(UserError):
+    """A WebAPI respondeu com erro (≠ "documento não existe"). No modo rigoroso
+    quem chama pára e tenta outra vez mais tarde, em vez de saltar o documento."""
+
+
 class PrimaveraConnection(models.Model):
     _name = "primavera.connection"
     _description = "Ligacao Primavera WebAPI"
@@ -181,32 +186,45 @@ class PrimaveraConnection(models.Model):
     # HTTP HELPERS
     # ─────────────────────────────────────────────────────────────────────
 
-    def _api_get(self, endpoint, timeout=10):
-        """GET endpoint; devolve o dict Results ou None se não existir/erro."""
+    def _api_get(self, endpoint, timeout=10, strict=False):
+        """GET endpoint; devolve o dict Results ou None se não existir/erro.
+        strict=True: só devolve None quando a WebAPI responde OK sem dados
+        ("não existe"); qualquer erro levanta PrimaveraApiError."""
         self.ensure_one()
         try:
             r = requests.get(f"{self.api_url}{endpoint}", headers=self._headers(), timeout=timeout)
+            if r.status_code == 401:
+                # Token já não é aceite (ex.: a WebAPI reiniciou): pedir outro e repetir uma vez
+                PrimaveraConnection._token_cache.pop(self.id, None)
+                r = requests.get(f"{self.api_url}{endpoint}", headers=self._headers(), timeout=timeout)
         except requests.Timeout:
-            raise UserError(_("Timeout a chamar %s") % endpoint)
+            raise PrimaveraApiError(_("Timeout a chamar %s") % endpoint)
         except requests.RequestException as exc:
-            raise UserError(_("Erro HTTP em %s: %s") % (endpoint, exc)) from exc
+            raise PrimaveraApiError(_("Erro HTTP em %s: %s") % (endpoint, exc)) from exc
 
         if r.status_code >= 400:
+            if strict:
+                raise PrimaveraApiError(_("HTTP %s em %s: %s") % (r.status_code, endpoint, r.text[:200]))
             return None
         try:
             body = r.json()
         except Exception:
+            if strict:
+                raise PrimaveraApiError(_("Resposta inválida em %s: %s") % (endpoint, r.text[:200]))
             return None
         if body.get("StatusCode", 200) >= 400 or body.get("ErrorMessage"):
+            if strict:
+                raise PrimaveraApiError(_("Erro da WebAPI em %s: %s") % (
+                    endpoint, body.get("ErrorMessage") or body.get("StatusCode")))
             return None
         return body.get("Results")
 
-    def _exists(self, endpoint):
-        results = self._api_get(endpoint)
+    def _exists(self, endpoint, strict=False):
+        results = self._api_get(endpoint, strict=strict)
         return bool(results and results.get("Existe"))
 
-    def _edita(self, endpoint):
-        results = self._api_get(endpoint)
+    def _edita(self, endpoint, strict=False):
+        results = self._api_get(endpoint, strict=strict)
         if not results:
             return None
         return results.get("Edita")
@@ -611,10 +629,11 @@ class PrimaveraConnection(models.Model):
         self._ecl_post_change(so, html.escape(_("Anulação desfeita no Primavera — ECL reactivada.")))
         self._log("ecls", "success", _("[notificação] %s: anulação desfeita no Primavera, ECL reactivada.") % so.primavera_ecl_ref)
 
-    def _resync_single_ecl(self, ecl_name):
+    def _resync_single_ecl(self, ecl_name, strict=False):
         """Re-sincroniza UMA ECL específica do Primavera para o Odoo.
         Usado pelo botão na sale.order ou por crons de re-sync.
-        ecl_name no formato 'ECL/<serie>/<num>'."""
+        ecl_name no formato 'ECL/<serie>/<num>'. strict=True: erro da WebAPI
+        levanta PrimaveraApiError (em vez de devolver None)."""
         self.ensure_one()
         # Parse ECL/2026/271 → serie=2026, num=271
         parts = (ecl_name or '').split('/')
@@ -623,7 +642,7 @@ class PrimaveraConnection(models.Model):
         serie, num = parts[1], parts[2]
         filial = self.api_filial or "000"
         ep = f"/v2/Vendas/Docs/Edita/{filial}/ECL/{serie}/{num}"
-        data = self._edita(ep)
+        data = self._edita(ep, strict=strict)
         if data is None or not data.get("Entidade"):
             return None
 
@@ -766,18 +785,33 @@ class PrimaveraConnection(models.Model):
                     self._verify_ecls()
                 except Exception as exc:
                     self._log("ecls", "error", _("[verificação] Erro: %s") % exc)
+                if self.sync_faturas:
+                    try:
+                        with self.env.cr.savepoint():
+                            self._verify_faturas()
+                    except Exception as exc:
+                        self._log("faturas", "error", _("[verificação] Erro: %s") % exc)
             return
 
         refs, new_ver = changed
         SO = self.env["sale.order"].sudo()
         alvo = SO.search(self._ecl_resync_domain() + [("primavera_ecl_ref", "in", refs)]) if refs else SO
         feitas = []
+        api_error = None
         for so in alvo:
-            if self._resync_single_ecl(so.primavera_ecl_ref):
-                feitas.append(so.primavera_ecl_ref)
-        ICP.set_param(k_ver, new_ver)
+            try:
+                if self._resync_single_ecl(so.primavera_ecl_ref, strict=True):
+                    feitas.append(so.primavera_ecl_ref)
+            except PrimaveraApiError as exc:
+                api_error = exc
+                break
         if feitas:
             self._log("ecls", "success", _("[incremental] %s ECL(s) alterada(s): %s") % (len(feitas), ", ".join(feitas)))
+        if api_error:
+            # Marca não avança: as ECLs alteradas voltam a ser tentadas na execução seguinte
+            self._log("ecls", "error", _("[incremental] Erro da WebAPI, tenta outra vez na próxima execução: %s") % api_error)
+            return
+        ICP.set_param(k_ver, new_ver)
 
     # ── Alerta de ligação SQL ao Primavera em baixo ─────────────────────
     # Anti-spam: só avisa se a falha durar mais de 1 h; 1 email nessa altura,
@@ -1022,6 +1056,87 @@ class PrimaveraConnection(models.Model):
                 body=Markup(body),
             )
 
+    # ── Verificação diária FA/FAT Odoo ↔ Primavera (26/10/2026) ──
+    # Rede de segurança da importação por número: compara (só leitura no
+    # Primavera) as FA/FAT da série do ano corrente e da anterior (só se o Odoo
+    # já a tiver). As que faltam no Odoo são importadas uma a uma; se faltarem
+    # mais de _VERIFY_FATURAS_MAX_IMPORT não importa nada e só avisa (algo de
+    # anormal). Só no Odoo → só reporta. Avisa os destinatários das
+    # notificações de ECL só quando há alguma coisa.
+    _VERIFY_FATURAS_MAX_IMPORT = 20
+
+    def _verify_faturas(self):
+        self.ensure_one()
+        hoje = fields.Date.context_today(self)
+        AM = self.env["account.move"].sudo()
+        tipos = ["FA"] + (["FAT"] if self.sync_faturas_fat else [])
+        anterior = str(hoje.year - 1)
+        series = [str(hoje.year)]
+        if AM.search_count([("primavera_ref", "=like", f"%/{anterior}/%")], limit=1):
+            series.append(anterior)
+        sql_conn = self._sql_connection()
+        if not sql_conn:
+            raise UserError(_("sem ligação ao SQL Server"))
+        try:
+            with sql_conn.cursor() as cur:
+                cur.execute(
+                    "SELECT TipoDoc, Serie, NumDoc, Nome FROM CabecDoc "
+                    f"WHERE TipoDoc IN ({','.join(['%s'] * len(tipos))}) "
+                    f"AND Serie IN ({','.join(['%s'] * len(series))})",
+                    tuple(tipos) + tuple(series),
+                )
+                prim = {}
+                for tipo, serie, num, nome in cur.fetchall():
+                    tipo, serie = tipo.strip(), serie.strip()
+                    prim[f"{tipo}/{serie}/{num}"] = (tipo, serie, int(num), nome or "")
+        finally:
+            sql_conn.close()
+
+        prefixos = tuple(f"{t}/{s}/" for t in tipos for s in series)
+        odoo = {r for r in AM.search([("primavera_ref", "!=", False)]).mapped("primavera_ref") if r.startswith(prefixos)}
+        faltam = sorted((k for k in prim if k not in odoo), key=lambda k: (prim[k][0], prim[k][1], prim[k][2]))
+        corrigido, atencao = [], []
+        if len(faltam) > self._VERIFY_FATURAS_MAX_IMPORT:
+            atencao.append(_("%s faturas do Primavera não estão no Odoo (ex.: %s) — não foram importadas "
+                             "automaticamente por serem demasiadas; verificar.") % (len(faltam), ", ".join(faltam[:5])))
+        else:
+            for ref in faltam:
+                tipo, serie, num, nome = prim[ref]
+                self._import_faturas_doc(tipo, serie, num - 1, 1, 1, None)
+                if AM.search_count([("primavera_ref", "=", ref)]):
+                    corrigido.append(_("%s — %s: faltava no Odoo; importada") % (ref, nome))
+                else:
+                    atencao.append(_("%s — %s: falta no Odoo e não foi possível importar") % (ref, nome))
+        for ref in sorted(odoo - set(prim)):
+            atencao.append(_("%s: existe no Odoo mas não no Primavera") % ref)
+
+        resumo = _("[verificação] %s fatura(s) comparadas; %s importada(s); %s a precisar de atenção.") % (
+            len(prim), len(corrigido), len(atencao))
+        self._log("faturas", "error" if atencao else "success",
+                  (resumo + " " + " | ".join(atencao))[:900] if atencao else resumo)
+        # Avisos "a precisar de atenção" só são notificados uma vez (até mudarem)
+        ICP = self.env["ir.config_parameter"].sudo()
+        k_rep = f"primavera_connector.fatura_verif_reportados.{self.id}"
+        ja = set(filter(None, (ICP.get_param(k_rep) or "").split("\n")))
+        ICP.set_param(k_rep, "\n".join(sorted(atencao)) or False)
+        atencao = [a for a in atencao if a not in ja]
+        if not (corrigido or atencao):
+            return
+        quando = fields.Datetime.context_timestamp(
+            self.with_context(tz="Europe/Lisbon"), fields.Datetime.now()).strftime("%d/%m/%Y %H:%M")
+        body = f"<p><b>Verificação diária das faturas FA/FAT</b> ({quando}) — {len(prim)} comparadas com o Primavera.</p>"
+        if corrigido:
+            body += "<p>Corrigido automaticamente:</p><ul>" + "".join(f"<li>{html.escape(x)}</li>" for x in corrigido) + "</ul>"
+        if atencao:
+            body += "<p><b>Precisa de atenção:</b></p><ul>" + "".join(f"<li>{html.escape(x)}</li>" for x in atencao) + "</ul>"
+        partners = self._ecl_notify_partners()
+        if partners:
+            partners[:1].message_notify(
+                partner_ids=partners.ids,
+                subject=f"Verificação das faturas: {len(corrigido)} importada(s), {len(atencao)} a ver",
+                body=Markup(body),
+            )
+
     @api.model
     def cron_resync_ecls_ano_corrente(self):
         """Cron de re-sync de ECLs (o nome mantém-se por compatibilidade):
@@ -1204,6 +1319,9 @@ class PrimaveraConnection(models.Model):
             try:
                 stats, mode = conn._run_partner_sync("customer")
                 conn._log("customers", "success", f"[{mode}] {conn._stats_msg(stats)}")
+            except PrimaveraApiError as exc:
+                # Erro passageiro da WebAPI: repete na próxima hora (o alerta de WebAPI em baixo é outro)
+                conn._log("customers", "error", str(exc))
             except Exception as exc:
                 conn._log("customers", "error", str(exc))
                 conn._send_sync_failure_alert("clientes", exc)
@@ -1214,6 +1332,8 @@ class PrimaveraConnection(models.Model):
             try:
                 stats, mode = conn._run_partner_sync("supplier")
                 conn._log("suppliers", "success", f"[{mode}] {conn._stats_msg(stats)}")
+            except PrimaveraApiError as exc:
+                conn._log("suppliers", "error", str(exc))
             except Exception as exc:
                 conn._log("suppliers", "error", str(exc))
                 conn._send_sync_failure_alert("fornecedores", exc)
@@ -1630,8 +1750,11 @@ class PrimaveraConnection(models.Model):
         else:
             scan = (f"{prefix}{str(num).zfill(digits)}" for num in range(1, max_num + 1))
 
+        # Incremental (códigos dados): erro da WebAPI levanta PrimaveraApiError e a
+        # marca de última execução não avança — os alterados são tentados outra vez.
+        strict = codes is not None
         for code in scan:
-            if not self._exists(f"{base_ep}/Existe/{code}"):
+            if not self._exists(f"{base_ep}/Existe/{code}", strict=strict):
                 if codes is not None:
                     continue
                 consecutive_misses += 1
@@ -1640,7 +1763,7 @@ class PrimaveraConnection(models.Model):
                 continue
 
             consecutive_misses = 0
-            data = self._edita(f"{base_ep}/Edita/{code}")
+            data = self._edita(f"{base_ep}/Edita/{code}", strict=strict)
             if not data:
                 stats["skipped"] += 1
                 continue
@@ -2014,82 +2137,95 @@ class PrimaveraConnection(models.Model):
         miss_stop = self.ecl_miss_stop or 50
         consecutive_misses = 0
         last_imported = last_num or 0
+        api_error = None
 
         for num in range(start, start + max_num):
-            ep = f"/v2/Vendas/Docs/Edita/{filial}/ECL/{serie}/{num}"
-            data = self._edita(ep)
+            prev_last = last_imported
+            try:
+                ep = f"/v2/Vendas/Docs/Edita/{filial}/ECL/{serie}/{num}"
+                data = self._edita(ep, strict=True)
 
-            if data is None:
-                # ECL não existe neste número
-                consecutive_misses += 1
-                if consecutive_misses >= miss_stop:
-                    break
-                continue
+                if data is None:
+                    # ECL não existe neste número
+                    consecutive_misses += 1
+                    if consecutive_misses >= miss_stop:
+                        break
+                    continue
 
-            # ECL existe na API — resetar misses e marcar como último encontrado
-            consecutive_misses = 0
-            last_imported = num
+                # ECL existe na API — resetar misses e marcar como último encontrado
+                consecutive_misses = 0
+                last_imported = num
 
-            if not data.get("Entidade"):
-                stats["skipped"] += 1
-                continue
+                if not data.get("Entidade"):
+                    stats["skipped"] += 1
+                    continue
 
-            ecl_name = f"ECL/{serie}/{num}"
-            entidade = data["Entidade"]
+                ecl_name = f"ECL/{serie}/{num}"
+                entidade = data["Entidade"]
 
-            existing_so = SO.search_count([("primavera_ecl_ref", "=", ecl_name)])
+                existing_so = SO.search_count([("primavera_ecl_ref", "=", ecl_name)])
 
-            # ECL que já chega anulada e ainda não existe no Odoo: não criar
-            if data.get("Anulado") and not existing_so:
-                stats["skipped"] += 1
-                continue
+                # ECL que já chega anulada e ainda não existe no Odoo: não criar
+                if data.get("Anulado") and not existing_so:
+                    stats["skipped"] += 1
+                    continue
 
-            # Tentar encontrar o parceiro pelo código Primavera
-            partner = Partner.search([("primavera_customer_code", "=", entidade)], limit=1)
+                # Tentar encontrar o parceiro pelo código Primavera
+                partner = Partner.search([("primavera_customer_code", "=", entidade)], limit=1)
 
-            # Importar ou actualizar parceiro
-            p_data = self._edita(f"/v2/Base/Clientes/Edita/{entidade}")
-            if p_data:
-                category = self.env.ref("primavera_connector.partner_category_primavera_customer")
-                vals = self._partner_vals_from_api(
-                    p_data, "customer", "primavera_customer_code", "customer_rank", category
+                # Importar ou actualizar parceiro
+                p_data = self._edita(f"/v2/Base/Clientes/Edita/{entidade}", strict=True)
+                if p_data:
+                    category = self.env.ref("primavera_connector.partner_category_primavera_customer")
+                    vals = self._partner_vals_from_api(
+                        p_data, "customer", "primavera_customer_code", "customer_rank", category
+                    )
+                    if vals:
+                        if not partner:
+                            self._safe_create_partner(Partner, vals)
+                            partner = Partner.search([("primavera_customer_code", "=", entidade)], limit=1)
+                        elif not partner.ref:
+                            # Parceiro existe mas sem ref (importado por versão anterior) — actualizar
+                            self._safe_write_partner(partner, {"ref": entidade})
+
+                if not partner:
+                    stats["skipped"] += 1
+                    continue
+
+                date_val = self._parse_date(data.get("Data") or data.get("DataDoc"))
+                campos = {
+                    cu["Nome"]: cu.get("Valor")
+                    for cu in data.get("CamposUtil", [])
+                    if cu.get("Nome") and cu.get("Valor") not in (None, "")
+                }
+                pais_code = self._clean(campos.get("CDU_Pais"))
+                incoterm_val = self._clean(campos.get("CDU_Incoterm"))
+                incoterm_local_val = self._clean(campos.get("CDU_IncotermLocal"))
+                pais_id = self._country_id(pais_code) if pais_code else False
+                transitario_val = self._clean(campos.get("CDU_transitario"))
+
+                # A ECL no Odoo é a sale.order (kanban do Documentos); o antigo
+                # registo export.ecl deixou de ser criado (14/10/2026).
+                so = self._sync_ecl_sale_order(
+                    ecl_name, partner, date_val, data,
+                    incoterm_val, incoterm_local_val, pais_id, transitario_val,
                 )
-                if vals:
-                    if not partner:
-                        self._safe_create_partner(Partner, vals)
-                        partner = Partner.search([("primavera_customer_code", "=", entidade)], limit=1)
-                    elif not partner.ref:
-                        # Parceiro existe mas sem ref (importado por versão anterior) — actualizar
-                        self._safe_write_partner(partner, {"ref": entidade})
+                if not so:
+                    stats["skipped"] += 1
+                elif existing_so:
+                    stats["updated"] += 1
+                else:
+                    stats["created"] += 1
+            except PrimaveraApiError as exc:
+                # Erro da WebAPI (≠ "não existe"): não saltar este número — parar
+                # aqui; a próxima execução recomeça nele.
+                last_imported = prev_last
+                api_error = (num, exc)
+                break
 
-            if not partner:
-                stats["skipped"] += 1
-                continue
-
-            date_val = self._parse_date(data.get("Data") or data.get("DataDoc"))
-            campos = {
-                cu["Nome"]: cu.get("Valor")
-                for cu in data.get("CamposUtil", [])
-                if cu.get("Nome") and cu.get("Valor") not in (None, "")
-            }
-            pais_code = self._clean(campos.get("CDU_Pais"))
-            incoterm_val = self._clean(campos.get("CDU_Incoterm"))
-            incoterm_local_val = self._clean(campos.get("CDU_IncotermLocal"))
-            pais_id = self._country_id(pais_code) if pais_code else False
-            transitario_val = self._clean(campos.get("CDU_transitario"))
-
-            # A ECL no Odoo é a sale.order (kanban do Documentos); o antigo
-            # registo export.ecl deixou de ser criado (14/10/2026).
-            so = self._sync_ecl_sale_order(
-                ecl_name, partner, date_val, data,
-                incoterm_val, incoterm_local_val, pais_id, transitario_val,
-            )
-            if not so:
-                stats["skipped"] += 1
-            elif existing_so:
-                stats["updated"] += 1
-            else:
-                stats["created"] += 1
+        if api_error:
+            self._log("ecls", "error", _("Erro da WebAPI na ECL/%s/%s — não foi saltada, tenta outra vez na próxima execução: %s")
+                      % (serie, api_error[0], api_error[1]))
 
         if not current:
             # Série do ano anterior: só registar quando houver novidades
@@ -2150,6 +2286,7 @@ class PrimaveraConnection(models.Model):
         miss_stop = miss_stop or 50
         consecutive_misses = 0
         last_imported = last_num or 0
+        api_error = None
 
         # Journal de vendas para as facturas
         journal = self.env["account.journal"].sudo().search(
@@ -2186,210 +2323,222 @@ class PrimaveraConnection(models.Model):
                     pass
 
         for num in range(start, start + scan_max):
-            ep = f"/v2/Vendas/Docs/Edita/{filial}/{doc_type}/{serie}/{num}"
-            data = self._edita(ep)
+            prev_last = last_imported
+            try:
+                ep = f"/v2/Vendas/Docs/Edita/{filial}/{doc_type}/{serie}/{num}"
+                data = self._edita(ep, strict=True)
 
-            if data is None:
-                consecutive_misses += 1
-                if consecutive_misses >= miss_stop:
-                    break
-                continue
+                if data is None:
+                    consecutive_misses += 1
+                    if consecutive_misses >= miss_stop:
+                        break
+                    continue
 
-            consecutive_misses = 0
-            last_imported = num
+                consecutive_misses = 0
+                last_imported = num
 
-            if not data.get("Entidade"):
-                stats["skipped"] += 1
-                continue
+                if not data.get("Entidade"):
+                    stats["skipped"] += 1
+                    continue
 
-            entidade = data["Entidade"]
-            fatura_name = f"{doc_type}/{serie}/{num}"
+                entidade = data["Entidade"]
+                fatura_name = f"{doc_type}/{serie}/{num}"
 
-            partner = Partner.search([("primavera_customer_code", "=", entidade)], limit=1)
-            if not partner:
-                p_data = self._edita(f"/v2/Base/Clientes/Edita/{entidade}")
-                if p_data:
-                    category = self.env.ref("primavera_connector.partner_category_primavera_customer")
-                    vals = self._partner_vals_from_api(
-                        p_data, "customer", "primavera_customer_code", "customer_rank", category
-                    )
-                    if vals:
-                        self._safe_create_partner(Partner, vals)
-                        partner = Partner.search([("primavera_customer_code", "=", entidade)], limit=1)
+                partner = Partner.search([("primavera_customer_code", "=", entidade)], limit=1)
+                if not partner:
+                    p_data = self._edita(f"/v2/Base/Clientes/Edita/{entidade}", strict=True)
+                    if p_data:
+                        category = self.env.ref("primavera_connector.partner_category_primavera_customer")
+                        vals = self._partner_vals_from_api(
+                            p_data, "customer", "primavera_customer_code", "customer_rank", category
+                        )
+                        if vals:
+                            self._safe_create_partner(Partner, vals)
+                            partner = Partner.search([("primavera_customer_code", "=", entidade)], limit=1)
 
-            date_val = self._parse_date(data.get("DataDoc") or data.get("Data"))
+                date_val = self._parse_date(data.get("DataDoc") or data.get("Data"))
 
-            # Campos utilizador do cabeçalho
-            campos = {
-                cu["Nome"]: cu.get("Valor")
-                for cu in data.get("CamposUtil", [])
-                if cu.get("Nome") and cu.get("Valor") not in (None, "")
-            }
-
-            pais_code = self._clean(campos.get("CDU_Pais")) or self._clean(data.get("Pais"))
-            pais_id = self._country_id(pais_code) if pais_code else False
-
-            move_vals = {
-                "move_type": "out_invoice",
-                "name": fatura_name,
-                "partner_id": partner.id if partner else False,
-                "invoice_date": date_val,
-                "ref": fatura_name,
-                "primavera_ref": fatura_name,
-                "primavera_doc_type": doc_type,
-                "primavera_serie": serie,
-                "primavera_num": num,
-                "primavera_filial": filial,
-                "narration": self._clean(data.get("Observacoes")),
-                "importador": self._clean(campos.get("CDU_CabVar1") or campos.get("CDU_Importador")),
-                "distribuidor": self._clean(campos.get("CDU_CabVar2") or campos.get("CDU_Distribuidor")),
-                "destino": self._clean(campos.get("CDU_CabVar3") or campos.get("CDU_Destino")),
-                "modo_transporte": self._clean(campos.get("CDU_CabVar4") or campos.get("CDU_ModoTransporte")),
-                "contentor": self._clean(campos.get("CDU_CabVar5") or campos.get("CDU_Contentor")),
-                "ref_cliente": self._clean(
-                    data.get("VossaRef") or data.get("VRef") or
-                    data.get("RefCliente") or data.get("Referencia") or
-                    data.get("Requisicao") or
-                    campos.get("CDU_VossaRef") or campos.get("CDU_RefCliente")
-                ),
-                "pais_destino_id": pais_id,
-            }
-            if journal:
-                move_vals["journal_id"] = journal.id
-            move_vals = {k: v for k, v in move_vals.items() if v not in (None, False, "")}
-
-            existing = AccountMove.search([("primavera_ref", "=", fatura_name)], limit=1)
-
-            # Construir linhas
-            linhas = data.get("Linhas") or []
-            line_vals_list = []
-
-            # Mapa CodIva → TaxaIva, lido do cabeçalho ResumoIva. Permite
-            # aplicar na linha a taxa exacta do Primavera e evitar que o
-            # Odoo aplique o default 23% dos produtos.
-            cod_to_rate_inv = {}
-            for r in (data.get("ResumoIva") or []):
-                cod = r.get("CodIva")
-                if cod is not None:
-                    cod_to_rate_inv[cod] = r.get("TaxaIva") or 0.0
-            AccountTax = self.env["account.tax"].sudo()
-
-            for i, linha in enumerate(linhas):
-                artigo = self._clean(linha.get("Artigo"))
-                desc = self._clean(linha.get("Descricao") or linha.get("Descricao2")) or artigo or "—"
-                qty = linha.get("Quantidade") or 0.0
-                price = linha.get("PrecUnit") or linha.get("Preco") or 0.0
-                lote = self._clean(linha.get("Lote"))
-                if lote and lote.startswith('<') and lote.endswith('>'):
-                    lote = False
-                peso_liq = linha.get("IntrastatMassaLiq") or 0.0
-                unidade = self._clean(linha.get("Unidade")) or ""
-
-                # Peso bruto e volume: vai buscar ao artigo (com cache)
-                if artigo and artigo not in artigo_cache:
-                    art_data = self._edita(f"/v2/Base/Artigos/Edita/{artigo}")
-                    artigo_cache[artigo] = {
-                        "peso_bruto": art_data.get("Peso") or 0.0 if art_data else 0.0,
-                        "volume": art_data.get("Volume") or 0.0 if art_data else 0.0,
-                    }
-                art_info = artigo_cache.get(artigo, {})
-
-                # Validade: já pré-carregada do SQL Server; fallback individual se cache vazio
-                data_val_raw = None
-                if artigo and lote:
-                    _key = (artigo, lote)
-                    if _key not in lote_cache:
-                        lote_cache[_key] = self._lote_data_validade(filial, artigo, lote)
-                    data_val_raw = lote_cache[_key]
-
-                product = Product.search([("default_code", "=", artigo)], limit=1) if artigo else Product
-
-                lv = {
-                    "name": desc,
-                    "quantity": qty,
-                    "price_unit": price,
-                    "lote": lote or False,
-                    "peso_liquido": peso_liq,
-                    "peso_bruto": art_info.get("peso_bruto", 0.0),
-                    "volume": art_info.get("volume", 0.0),
-                    "data_validade": self._parse_date(data_val_raw) if data_val_raw else False,
-                    "caixas": int(qty) if unidade.upper() == "CX" else 0,
-                    "unidades_linha": qty,
+                # Campos utilizador do cabeçalho
+                campos = {
+                    cu["Nome"]: cu.get("Valor")
+                    for cu in data.get("CamposUtil", [])
+                    if cu.get("Nome") and cu.get("Valor") not in (None, "")
                 }
-                if product:
-                    lv["product_id"] = product.id
-                elif default_account:
-                    lv["account_id"] = default_account.id
 
-                # CamposUtil da linha
-                for cu in linha.get("CamposUtil", []):
-                    nome = cu.get("Nome", "")
-                    val = cu.get("Valor")
-                    if val not in (None, ""):
-                        if nome == "CDU_QuantidadeAlternativa":
-                            lv["unidades_linha"] = val or lv["unidades_linha"]
-                        elif nome in ("CDU_DataValidade", "CDU_Validade"):
-                            lv["data_validade"] = self._parse_date(val)
-                        elif nome == "CDU_Palete":
-                            pass  # ignorar por agora
+                pais_code = self._clean(campos.get("CDU_Pais")) or self._clean(data.get("Pais"))
+                pais_id = self._country_id(pais_code) if pais_code else False
 
-                # Taxa IVA explícita conforme Primavera (ver cod_to_rate_inv
-                # acima). account.move.line usa 'tax_ids' (plural).
-                cod_iva = linha.get("CodIva")
-                rate = cod_to_rate_inv.get(cod_iva, 0.0) if cod_iva else 0.0
-                tax_ids_val = []
-                if rate and rate > 0:
-                    tax = AccountTax.search([
-                        ("type_tax_use", "=", "sale"),
-                        ("amount", "=", rate),
-                        ("price_include", "=", False),
-                        ("name", "not ilike", "AZ"),
-                        ("name", "not ilike", "MA"),
-                    ], limit=1)
-                    if tax:
-                        tax_ids_val = tax.ids
+                move_vals = {
+                    "move_type": "out_invoice",
+                    "name": fatura_name,
+                    "partner_id": partner.id if partner else False,
+                    "invoice_date": date_val,
+                    "ref": fatura_name,
+                    "primavera_ref": fatura_name,
+                    "primavera_doc_type": doc_type,
+                    "primavera_serie": serie,
+                    "primavera_num": num,
+                    "primavera_filial": filial,
+                    "narration": self._clean(data.get("Observacoes")),
+                    "importador": self._clean(campos.get("CDU_CabVar1") or campos.get("CDU_Importador")),
+                    "distribuidor": self._clean(campos.get("CDU_CabVar2") or campos.get("CDU_Distribuidor")),
+                    "destino": self._clean(campos.get("CDU_CabVar3") or campos.get("CDU_Destino")),
+                    "modo_transporte": self._clean(campos.get("CDU_CabVar4") or campos.get("CDU_ModoTransporte")),
+                    "contentor": self._clean(campos.get("CDU_CabVar5") or campos.get("CDU_Contentor")),
+                    "ref_cliente": self._clean(
+                        data.get("VossaRef") or data.get("VRef") or
+                        data.get("RefCliente") or data.get("Referencia") or
+                        data.get("Requisicao") or
+                        campos.get("CDU_VossaRef") or campos.get("CDU_RefCliente")
+                    ),
+                    "pais_destino_id": pais_id,
+                }
+                if journal:
+                    move_vals["journal_id"] = journal.id
+                move_vals = {k: v for k, v in move_vals.items() if v not in (None, False, "")}
 
-                lv = {k: v for k, v in lv.items() if v not in (None, False, "")}
-                # tax_ids aplicado SEMPRE (inclusive lista vazia) para
-                # sobrepor o default do produto. Deve ir depois do filtro
-                # que remove False.
-                lv["tax_ids"] = [(6, 0, tax_ids_val)]
-                line_vals_list.append((0, 0, lv))
+                existing = AccountMove.search([("primavera_ref", "=", fatura_name)], limit=1)
 
-            # ── Documentos de origem ───────────────────────────────────────
-            origens = self._extrair_docs_origem(data, linhas)
-            if origens:
-                move_vals["primavera_docs_origem"] = ", ".join(origens)
+                # Construir linhas
+                linhas = data.get("Linhas") or []
+                line_vals_list = []
 
-            # Campos de cabeçalho que são seguros actualizar mesmo em faturas posted
-            _SAFE_HEADER = {
-                'importador', 'distribuidor', 'destino', 'modo_transporte',
-                'contentor', 'pais_destino_id', 'ref_cliente',
-                'narration', 'primavera_docs_origem',
-            }
+                # Mapa CodIva → TaxaIva, lido do cabeçalho ResumoIva. Permite
+                # aplicar na linha a taxa exacta do Primavera e evitar que o
+                # Odoo aplique o default 23% dos produtos.
+                cod_to_rate_inv = {}
+                for r in (data.get("ResumoIva") or []):
+                    cod = r.get("CodIva")
+                    if cod is not None:
+                        cod_to_rate_inv[cod] = r.get("TaxaIva") or 0.0
+                AccountTax = self.env["account.tax"].sudo()
 
-            if existing:
-                if existing.state == "draft":
-                    existing.invoice_line_ids.unlink()
-                    update_vals = {k: v for k, v in move_vals.items()
-                                   if k not in ("move_type", "journal_id")}
-                    update_vals["invoice_line_ids"] = line_vals_list
-                    existing.write(update_vals)
+                for i, linha in enumerate(linhas):
+                    artigo = self._clean(linha.get("Artigo"))
+                    desc = self._clean(linha.get("Descricao") or linha.get("Descricao2")) or artigo or "—"
+                    qty = linha.get("Quantidade") or 0.0
+                    price = linha.get("PrecUnit") or linha.get("Preco") or 0.0
+                    lote = self._clean(linha.get("Lote"))
+                    if lote and lote.startswith('<') and lote.endswith('>'):
+                        lote = False
+                    peso_liq = linha.get("IntrastatMassaLiq") or 0.0
+                    unidade = self._clean(linha.get("Unidade")) or ""
+
+                    # Peso bruto e volume: vai buscar ao artigo (com cache)
+                    if artigo and artigo not in artigo_cache:
+                        art_data = self._edita(f"/v2/Base/Artigos/Edita/{artigo}")
+                        artigo_cache[artigo] = {
+                            "peso_bruto": art_data.get("Peso") or 0.0 if art_data else 0.0,
+                            "volume": art_data.get("Volume") or 0.0 if art_data else 0.0,
+                        }
+                    art_info = artigo_cache.get(artigo, {})
+
+                    # Validade: já pré-carregada do SQL Server; fallback individual se cache vazio
+                    data_val_raw = None
+                    if artigo and lote:
+                        _key = (artigo, lote)
+                        if _key not in lote_cache:
+                            lote_cache[_key] = self._lote_data_validade(filial, artigo, lote)
+                        data_val_raw = lote_cache[_key]
+
+                    product = Product.search([("default_code", "=", artigo)], limit=1) if artigo else Product
+
+                    lv = {
+                        "name": desc,
+                        "quantity": qty,
+                        "price_unit": price,
+                        "lote": lote or False,
+                        "peso_liquido": peso_liq,
+                        "peso_bruto": art_info.get("peso_bruto", 0.0),
+                        "volume": art_info.get("volume", 0.0),
+                        "data_validade": self._parse_date(data_val_raw) if data_val_raw else False,
+                        "caixas": int(qty) if unidade.upper() == "CX" else 0,
+                        "unidades_linha": qty,
+                    }
+                    if product:
+                        lv["product_id"] = product.id
+                    elif default_account:
+                        lv["account_id"] = default_account.id
+
+                    # CamposUtil da linha
+                    for cu in linha.get("CamposUtil", []):
+                        nome = cu.get("Nome", "")
+                        val = cu.get("Valor")
+                        if val not in (None, ""):
+                            if nome == "CDU_QuantidadeAlternativa":
+                                lv["unidades_linha"] = val or lv["unidades_linha"]
+                            elif nome in ("CDU_DataValidade", "CDU_Validade"):
+                                lv["data_validade"] = self._parse_date(val)
+                            elif nome == "CDU_Palete":
+                                pass  # ignorar por agora
+
+                    # Taxa IVA explícita conforme Primavera (ver cod_to_rate_inv
+                    # acima). account.move.line usa 'tax_ids' (plural).
+                    cod_iva = linha.get("CodIva")
+                    rate = cod_to_rate_inv.get(cod_iva, 0.0) if cod_iva else 0.0
+                    tax_ids_val = []
+                    if rate and rate > 0:
+                        tax = AccountTax.search([
+                            ("type_tax_use", "=", "sale"),
+                            ("amount", "=", rate),
+                            ("price_include", "=", False),
+                            ("name", "not ilike", "AZ"),
+                            ("name", "not ilike", "MA"),
+                        ], limit=1)
+                        if tax:
+                            tax_ids_val = tax.ids
+
+                    lv = {k: v for k, v in lv.items() if v not in (None, False, "")}
+                    # tax_ids aplicado SEMPRE (inclusive lista vazia) para
+                    # sobrepor o default do produto. Deve ir depois do filtro
+                    # que remove False.
+                    lv["tax_ids"] = [(6, 0, tax_ids_val)]
+                    line_vals_list.append((0, 0, lv))
+
+                # ── Documentos de origem ───────────────────────────────────────
+                origens = self._extrair_docs_origem(data, linhas)
+                if origens:
+                    move_vals["primavera_docs_origem"] = ", ".join(origens)
+
+                # Campos de cabeçalho que são seguros actualizar mesmo em faturas posted
+                _SAFE_HEADER = {
+                    'importador', 'distribuidor', 'destino', 'modo_transporte',
+                    'contentor', 'pais_destino_id', 'ref_cliente',
+                    'narration', 'primavera_docs_origem',
+                }
+
+                if existing:
+                    if existing.state == "draft":
+                        existing.invoice_line_ids.unlink()
+                        update_vals = {k: v for k, v in move_vals.items()
+                                       if k not in ("move_type", "journal_id")}
+                        update_vals["invoice_line_ids"] = line_vals_list
+                        existing.write(update_vals)
+                    else:
+                        # Fatura já contabilizada: actualiza apenas campos que não afectam contabilidade
+                        header_update = {k: v for k, v in move_vals.items() if k in _SAFE_HEADER}
+                        if header_update:
+                            existing.write(header_update)
+                    stats["updated"] += 1
+                    target_move = existing
                 else:
-                    # Fatura já contabilizada: actualiza apenas campos que não afectam contabilidade
-                    header_update = {k: v for k, v in move_vals.items() if k in _SAFE_HEADER}
-                    if header_update:
-                        existing.write(header_update)
-                stats["updated"] += 1
-                target_move = existing
-            else:
-                move_vals["invoice_line_ids"] = line_vals_list
-                target_move = AccountMove.create(move_vals)
-                stats["created"] += 1
+                    move_vals["invoice_line_ids"] = line_vals_list
+                    target_move = AccountMove.create(move_vals)
+                    stats["created"] += 1
 
-            # ── Ligar a ECL e criar todos ──────────────────────────────────
-            if origens:
-                self._link_fatura_to_ecl(target_move, fatura_name, origens)
+                # ── Ligar a ECL e criar todos ──────────────────────────────────
+                if origens:
+                    self._link_fatura_to_ecl(target_move, fatura_name, origens)
+            except PrimaveraApiError as exc:
+                # Erro da WebAPI (≠ "não existe"): não saltar esta fatura — parar
+                # aqui; a próxima execução recomeça nela.
+                last_imported = prev_last
+                api_error = (num, exc)
+                break
+
+        if api_error:
+            self._log("faturas", "error", _("Erro da WebAPI na %s/%s/%s — não foi saltada, tenta outra vez na próxima execução: %s")
+                      % (doc_type, serie, api_error[0], api_error[1]))
 
         if not counter_field:
             # Série do ano anterior: contador guardado por quem chama
