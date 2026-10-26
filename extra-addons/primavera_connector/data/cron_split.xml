@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Crons "split" — clientes / fornecedores / artigos individualmente.
+        Substituem o cron_sync_active_connections (id=77) que fazia tudo em
+        bloco e rebentava por timeout quando a WebAPI Primavera respondia
+        devagar.
+
+        noupdate="1" preserva alterações feitas via UI (active, nextcall,
+        interval) após futuros upgrades do módulo.
+
+        Cadências (24/09/2026):
+        - Clientes:    de hora a hora, ao minuto :05
+        - Fornecedores: de hora a hora, ao minuto :20
+        - Artigos:     de hora a hora, ao minuto :35
+
+        Staggered para não bater na WebAPI simultaneamente.
+    -->
+
+    <record id="ir_cron_primavera_customers_only" model="ir.cron">
+        <field name="name">Primavera: sincronizar SÓ clientes</field>
+        <field name="model_id" ref="model_primavera_connection"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_import_customers_only()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="nextcall">2026-09-24 18:05:00</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_primavera_suppliers_only" model="ir.cron">
+        <field name="name">Primavera: sincronizar SÓ fornecedores</field>
+        <field name="model_id" ref="model_primavera_connection"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_import_suppliers_only()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="nextcall">2026-09-24 18:20:00</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_primavera_products_only" model="ir.cron">
+        <field name="name">Primavera: sincronizar artigos (SQL, só leitura)</field>
+        <field name="model_id" ref="model_primavera_connection"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_import_products_only()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="nextcall">2026-09-24 17:35:00</field>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>

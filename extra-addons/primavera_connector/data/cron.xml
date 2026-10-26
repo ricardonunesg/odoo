@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Sync completo (clientes, fornecedores, artigos, faturas) — 1x por dia -->
+    <record id="ir_cron_primavera_sync" model="ir.cron">
+        <field name="name">Primavera: sincronizar clientes, fornecedores, artigos e ECLs</field>
+        <field name="model_id" ref="model_primavera_connection"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_sync_active_connections()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- Sync funcionários — 1x por dia de madrugada (02:00 UTC = 03:00 Lisboa) -->
+    <record id="ir_cron_primavera_employees" model="ir.cron">
+        <field name="name">Primavera: sincronizar funcionários</field>
+        <field name="model_id" ref="model_primavera_connection"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_import_employees_only()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="nextcall">2026-04-28 02:00:00</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- Import de ECLs apenas — cada minuto -->
+    <record id="ir_cron_primavera_ecls" model="ir.cron">
+        <field name="name">Primavera: importar ECLs novas</field>
+        <field name="model_id" ref="model_primavera_connection"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_import_ecls_only()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- Re-sincronizar ECLs do ano corrente (apanha alterações em ECLs já importadas) — cada hora -->
+    <record id="ir_cron_primavera_resync_ecls" model="ir.cron">
+        <field name="name">Primavera: re-sincronizar ECLs do ano corrente</field>
+        <field name="model_id" ref="model_primavera_connection"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_resync_ecls_ano_corrente()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- Import de Faturas (FA + FAT) — cada minuto -->
+    <record id="ir_cron_primavera_faturas" model="ir.cron">
+        <field name="name">Primavera: importar Faturas novas (FA + FAT)</field>
+        <field name="model_id" ref="model_primavera_connection"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_import_faturas_only()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- Report ad-hoc: ECLs alteradas hoje. Corre 21 e 22/Jul às 17:00 UTC (18h Lisboa).
+         O próprio método auto-desactiva o cron após 2026-07-22. -->
+    <record id="ir_cron_primavera_report_ecls_hoje" model="ir.cron">
+        <field name="name">Primavera: report diário de ECLs alteradas (temp)</field>
+        <field name="model_id" ref="model_primavera_connection"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_report_ecls_alterados_hoje()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="nextcall">2026-07-21 17:00:00</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- Health check da WebAPI Primavera — cada 5 minutos.
+         Envia email nas transições saudável↔falha; não spamma. -->
+    <record id="ir_cron_primavera_api_health" model="ir.cron">
+        <field name="name">Primavera: health check da WebAPI (alerta se cai)</field>
+        <field name="model_id" ref="model_primavera_connection"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_api_health_check()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- Alerta GR/GRT por faturar — corre diariamente às 07:00 UTC (08h Lisboa)
+         mas só executa se hoje for Sexta OU último dia do mês. -->
+    <record id="ir_cron_primavera_alerta_gr_grt" model="ir.cron">
+        <field name="name">Primavera: alerta GR/GRT por faturar (6ª feira + último dia do mês)</field>
+        <field name="model_id" ref="model_primavera_connection"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_alerta_gr_grt_por_faturar()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="nextcall">2026-07-31 07:00:00</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- Report mensal de FAs destino Brasil — último dia do mês às 19:00 UTC (20h Lisboa).
+         Corre diariamente mas o método só executa se hoje for o último dia do mês. -->
+    <record id="ir_cron_primavera_report_fa_br_mensal" model="ir.cron">
+        <field name="name">Primavera: report mensal FAs destino Brasil</field>
+        <field name="model_id" ref="model_primavera_connection"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_report_fa_br_mensal()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="nextcall">2026-07-28 19:00:00</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- Validação mensal das Composições — dia 3 de cada mês às 07:00 (UTC).
+         Agendamento mensal: o próprio cron decide quando correr (próxima execução = dia 3). -->
+    <record id="ir_cron_primavera_validar_composicoes" model="ir.cron">
+        <field name="name">Primavera: Validar Composições do mês anterior (Apenas MPs)</field>
+        <field name="model_id" ref="model_primavera_connection"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_validar_composicoes_mes_anterior()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">months</field>
+        <field name="nextcall">2026-06-03 07:00:00</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- Validação mensal da produção do Preparado Graso (MP.19) — dia 1 de cada mês às 08:00. -->
+    <record id="ir_cron_primavera_validar_prep_graso" model="ir.cron">
+        <field name="name">Primavera: Validação de Composições do Preparado Graso MP.19</field>
+        <field name="model_id" ref="model_primavera_connection"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_validar_prep_graso_mes_anterior()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">months</field>
+        <field name="nextcall">2026-10-01 08:00:00</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- Validações semanais — sábado às 07:00 UTC (08:00 Lisboa no verão), semana
+         de sábado a sexta anteriores, só para o Gonçalo. noupdate: upgrades não
+         repõem nextcall/active. -->
+    <data noupdate="1">
+        <record id="ir_cron_primavera_validar_composicoes_semanal" model="ir.cron">
+            <field name="name">Primavera: Validar Composições da semana anterior (Apenas MPs)</field>
+            <field name="model_id" ref="model_primavera_connection"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_validar_composicoes_semana_anterior()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">weeks</field>
+            <field name="nextcall">2026-09-26 07:00:00</field>
+            <field name="active">True</field>
+        </record>
+
+        <record id="ir_cron_primavera_validar_prep_graso_semanal" model="ir.cron">
+            <field name="name">Primavera: Validação semanal do Preparado Graso MP.19</field>
+            <field name="model_id" ref="model_primavera_connection"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_validar_prep_graso_semana_anterior()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">weeks</field>
+            <field name="nextcall">2026-09-26 07:05:00</field>
+            <field name="active">True</field>
+        </record>
+    </data>
+</odoo>
