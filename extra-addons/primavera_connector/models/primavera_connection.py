@@ -11,7 +11,7 @@ from dateutil.relativedelta import relativedelta
 from markupsafe import Markup
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
-from odoo.tools import float_compare, html2plaintext
+from odoo.tools import float_compare, float_round, html2plaintext
 
 SYNC_FAILURE_ALERT_EMAIL = "goncalo.simoes@mirazeite.com"
 
@@ -1880,6 +1880,7 @@ class PrimaveraConnection(models.Model):
                 "name": desc or "—",
                 "product_uom_qty": qty or 1.0,
                 "price_unit": price if price is not None else 0.0,
+                "discount": self._desconto_linha(linha, data),
                 "product_uom": uom.id if uom else False,
                 "lote": lote or False,
                 "peso_liquido": peso_liq,
@@ -2447,6 +2448,7 @@ class PrimaveraConnection(models.Model):
                         "name": desc,
                         "quantity": qty,
                         "price_unit": price,
+                        "discount": self._desconto_linha(linha, data),
                         "lote": lote or False,
                         "peso_liquido": peso_liq,
                         "peso_bruto": art_info.get("peso_bruto", 0.0),
@@ -3189,6 +3191,19 @@ class PrimaveraConnection(models.Model):
             return False
         code_str = str(code).strip()
         return self._MODO_TRANSPORTE.get(code_str, code_str) or False
+
+    def _desconto_linha(self, linha, cabecalho):
+        """Desconto efectivo (%) da linha no Odoo, como o Primavera calcula o
+        PrecoLiquido: descontos de linha 1–3 em cascata e o desconto de cliente do
+        cabeçalho (DescEntidade), salvo linhas não sujeitas a ele. O desconto
+        financeiro (DescFinanceiro) não entra — não é usado (27/10/2026)."""
+        factor = 1.0
+        for campo in ("Desconto1", "Desconto2", "Desconto3"):
+            factor *= 1 - float(linha.get(campo) or 0) / 100
+        if not linha.get("NaoSujDescontoCabec"):
+            factor *= 1 - float(cabecalho.get("DescEntidade") or 0) / 100
+        return float_round((1 - factor) * 100,
+                           precision_digits=self.env["decimal.precision"].precision_get("Discount"))
 
     def _clean(self, value):
         if value is None:
