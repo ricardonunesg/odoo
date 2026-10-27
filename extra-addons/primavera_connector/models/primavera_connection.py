@@ -510,9 +510,10 @@ class PrimaveraConnection(models.Model):
                 continue
             k = l.product_id.default_code or l.product_id.display_name
             # compara-se pelo código; nos textos mostra-se a descrição (mais fácil de ler)
-            d = lines.setdefault(k, {"qty": 0.0, "prices": set(), "name": l.product_id.name or k})
+            d = lines.setdefault(k, {"qty": 0.0, "prices": set(), "discounts": set(), "name": l.product_id.name or k})
             d["qty"] += l.product_uom_qty
             d["prices"].add(round(l.price_unit, 4))
+            d["discounts"].add(round(l.discount or 0.0, 2))
         head = {"Data": so.date_order.date() if so.date_order else False}
         for f, label in self._ECL_HEAD_FIELDS:
             v = so[f]
@@ -535,6 +536,9 @@ class PrimaveraConnection(models.Model):
                 if a["prices"] != b["prices"]:
                     fmt = lambda s: " / ".join(self._fmt_num(p, 2) for p in sorted(s))
                     out.append(f"{name} — preço {fmt(b['prices'])} → {fmt(a['prices'])}")
+                if a["discounts"] != b["discounts"]:
+                    fmt = lambda s: " / ".join(self._fmt_num(p) + "%" for p in sorted(s))
+                    out.append(f"{name} — desconto {fmt(b['discounts'])} → {fmt(a['discounts'])}")
         for label, bv in before["head"].items():
             av = after["head"].get(label)
             if (bv or "") != (av or ""):
@@ -939,13 +943,18 @@ class PrimaveraConnection(models.Model):
                                 "transitário": (tr or "").strip(), "país": (pais or "").strip()},
                     }
                 cur.execute(
-                    "SELECT 'ECL/' + c.Serie + '/' + CAST(c.NumDoc AS varchar), l.Artigo, l.Quantidade, l.PrecUnit "
+                    "SELECT 'ECL/' + c.Serie + '/' + CAST(c.NumDoc AS varchar), l.Artigo, l.Quantidade, l.PrecUnit, "
+                    "l.Desconto1, l.Desconto2, l.Desconto3, l.NaoSujDescontoCabec, c.DescEntidade "
                     "FROM CabecDoc c JOIN LinhasDoc l ON l.IdCabecDoc = c.Id "
                     "WHERE c.TipoDoc = 'ECL' AND c.Serie IN (%s, %s) AND l.Artigo IS NOT NULL AND l.Artigo <> ''", series)
-                for ref, art, q, p in cur.fetchall():
-                    d = prim[ref]["linhas"].setdefault(art, [0.0, set()])
+                for ref, art, q, p, d1, d2, d3, naosuj, dent in cur.fetchall():
+                    d = prim[ref]["linhas"].setdefault(art, [0.0, set(), set()])
                     d[0] += float(q or 0)
                     d[1].add(round(float(p or 0), 2))
+                    # mesmo cálculo da importação, para não haver falsas diferenças
+                    d[2].add(self._desconto_linha(
+                        {"Desconto1": d1, "Desconto2": d2, "Desconto3": d3, "NaoSujDescontoCabec": naosuj},
+                        {"DescEntidade": dent}))
         finally:
             sql_conn.close()
         return prim, series
@@ -954,9 +963,10 @@ class PrimaveraConnection(models.Model):
         ol = {}
         for l in so.order_line:
             if l.product_id and not l.display_type:
-                d = ol.setdefault(l.product_id.default_code, [0.0, set()])
+                d = ol.setdefault(l.product_id.default_code, [0.0, set(), set()])
                 d[0] += l.product_uom_qty
                 d[1].add(round(l.price_unit, 2))
+                d[2].add(round(l.discount or 0.0, 2))
         dif = []
         for k in sorted(set(ol) | set(p["linhas"])):
             a, b = p["linhas"].get(k), ol.get(k)
@@ -966,6 +976,9 @@ class PrimaveraConnection(models.Model):
                 dif.append(f"{k}: quantidade Primavera {self._fmt_num(a[0])} / Odoo {self._fmt_num(b[0])}")
             elif a[1] != b[1]:
                 dif.append(f"{k}: preço diferente")
+            elif a[2] != b[2]:
+                fmt = lambda s: " / ".join(self._fmt_num(x) + "%" for x in sorted(s))
+                dif.append(f"{k}: desconto Primavera {fmt(a[2])} / Odoo {fmt(b[2])}")
         cab_o = {"incoterm": so.ecl_incoterm or "", "local": so.ecl_incoterm_local or "",
                  "transitário": so.ecl_transitario or "", "país": so.ecl_pais_destino_id.code or ""}
         for k, v in p["cab"].items():
