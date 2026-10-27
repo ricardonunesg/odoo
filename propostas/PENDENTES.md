@@ -21,8 +21,15 @@ quantidade e preço da linha estão certos.
 FA/2026/73 (41.769,50 vs 41.769,51), FA/2026/171 (57.133,18 vs 57.133,17), FAT/2026/105 (12.463,71 vs 12.463,72),
 FA/2026/206 (42.501,46 vs 42.501,45) — total sem IVA Odoo vs Primavera.
 
+## Arredondamentos aceites (ponto 3, 27/10/2026)
+37 documentos com 1–2 cêntimos de diferença face ao Primavera só por método de cálculo (mesmas quantidades, preços, descontos e taxas):
+Primavera arredonda bruto e desconto em separado e o IVA linha a linha; o Odoo arredonda o subtotal e o IVA no total (round_globally). Aceite pelo user.
+
+## IVA: FA/2026/176 junta-se às 16
+FA/2026/176 — IVA 23% no Odoo vs 6% no Primavera desde a importação (Maio); a correcção dos descontos reduziu a diferença (602,78 → 586,59 €). Uma reimportação no ensaio corrigiu o IVA (pista).
+
 ## Pontos já combinados, por ordem
-3. Descontos de linha não importados (88 faturas + 24 ECLs).
+3. ~~Descontos~~ — aplicado 27/10/2026.
 4. Clientes/fornecedores anulados não arquivados (FO0160, FO0792).
 5. Fichas sobrescritas pela volta nocturna por NIF partilhado (MARIN TRADING e outras 4).
 6. Casas decimais do peso (3 ou 5).
