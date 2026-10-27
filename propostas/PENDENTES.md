@@ -30,7 +30,7 @@ FA/2026/176 — IVA 23% no Odoo vs 6% no Primavera desde a importação (Maio); 
 
 ## Pontos já combinados, por ordem
 3. ~~Descontos~~ — aplicado 27/10/2026.
-4. Clientes/fornecedores anulados não arquivados (FO0160, FO0792).
+4. ~~Clientes/fornecedores anulados~~ — aplicado 27/10/2026 (FO0160 e FO0792 arquivados).
 5. Fichas sobrescritas pela volta nocturna por NIF partilhado (MARIN TRADING e outras 4).
 6. Casas decimais do peso (3 ou 5).
 
