@@ -1,4 +1,5 @@
 from . import documento_morada
+from . import ir_sequence  # número de documento sem repetir
 from . import res_company
 from . import product_ext
 from . import certificado_organoletica

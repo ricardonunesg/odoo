@@ -333,7 +333,7 @@ class BoletimAnalises(models.Model):
         # Gerar número para o boletim actual se ainda for 'Novo'
         if self.name == 'Novo':
             self.name = (
-                self.env['ir.sequence'].next_by_code('boletim.analises') or 'Novo'
+                self.env['ir.sequence'].next_by_code_sem_repetir('boletim.analises', 'boletim.analises') or 'Novo'
             )
 
         # Preencher boletim actual com 1º grupo
@@ -348,7 +348,7 @@ class BoletimAnalises(models.Model):
 
         # Criar novos boletins para prefixos adicionais
         for prefixo in prefixos[1:]:
-            seq = self.env['ir.sequence'].next_by_code('boletim.analises') or 'Novo'
+            seq = self.env['ir.sequence'].next_by_code_sem_repetir('boletim.analises', 'boletim.analises') or 'Novo'
             novo = self.create({
                 'name':        seq,
                 'template_id': self.template_id.id,
@@ -398,7 +398,7 @@ class BoletimAnalises(models.Model):
     def action_confirm(self):
         for rec in self:
             if rec.name == "Novo":
-                rec.name = self.env["ir.sequence"].next_by_code("boletim.analises") or "Novo"
+                rec.name = self.env["ir.sequence"].next_by_code_sem_repetir("boletim.analises", "boletim.analises") or "Novo"
             rec.state = "confirmed"
 
     def action_reset_draft(self):
@@ -410,7 +410,7 @@ class BoletimAnalises(models.Model):
     def action_print_pdf(self):
         for rec in self:
             if rec.name == "Novo":
-                rec.name = self.env["ir.sequence"].next_by_code("boletim.analises") or "Novo"
+                rec.name = self.env["ir.sequence"].next_by_code_sem_repetir("boletim.analises", "boletim.analises") or "Novo"
         return self.env.ref("documentos.action_report_boletim_analises").report_action(self)
 
 

@@ -278,7 +278,7 @@ class CertificadoNarrativoAbstract(models.AbstractModel):
             if rec.name == 'Novo':
                 seq = rec._get_sequence_code()
                 if seq:
-                    rec.name = self.env['ir.sequence'].next_by_code(seq) or 'Novo'
+                    rec.name = self.env['ir.sequence'].next_by_code_sem_repetir(seq, rec._name) or 'Novo'
             rec.state = 'confirmed'
 
     def action_reset_draft(self):
@@ -295,5 +295,5 @@ class CertificadoNarrativoAbstract(models.AbstractModel):
             if rec.name == 'Novo':
                 seq = rec._get_sequence_code()
                 if seq:
-                    rec.name = self.env['ir.sequence'].next_by_code(seq) or 'Novo'
+                    rec.name = self.env['ir.sequence'].next_by_code_sem_repetir(seq, rec._name) or 'Novo'
         return self.env.ref(xmlid).report_action(self)

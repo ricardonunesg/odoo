@@ -192,7 +192,8 @@ class CertificadoConformidadeAlimentar(models.Model):
         for rec in self:
             if rec.name == 'Novo':
                 rec.name = (
-                    self.env['ir.sequence'].next_by_code('certificado.conformidade.alimentar')
+                    self.env['ir.sequence'].next_by_code_sem_repetir(
+                        'certificado.conformidade.alimentar', 'certificado.conformidade.alimentar')
                     or 'Novo'
                 )
             rec.state = 'confirmed'
@@ -207,7 +208,8 @@ class CertificadoConformidadeAlimentar(models.Model):
         for rec in self:
             if rec.name == 'Novo':
                 rec.name = (
-                    self.env['ir.sequence'].next_by_code('certificado.conformidade.alimentar')
+                    self.env['ir.sequence'].next_by_code_sem_repetir(
+                        'certificado.conformidade.alimentar', 'certificado.conformidade.alimentar')
                     or 'Novo'
                 )
         return self.env.ref('documentos.action_report_certificado_conformidade').report_action(self)

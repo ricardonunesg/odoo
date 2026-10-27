@@ -151,7 +151,7 @@ class DeclaracaoLote(models.Model):
     def action_confirm(self):
         for rec in self:
             if rec.name == "Novo":
-                rec.name = self.env["ir.sequence"].next_by_code("declaracao.lote") or "Novo"
+                rec.name = self.env["ir.sequence"].next_by_code_sem_repetir("declaracao.lote", "declaracao.lote") or "Novo"
             rec.state = "confirmed"
 
     def action_reset_draft(self):
@@ -163,7 +163,7 @@ class DeclaracaoLote(models.Model):
     def action_print_pdf(self):
         for rec in self:
             if rec.name == "Novo":
-                rec.name = self.env["ir.sequence"].next_by_code("declaracao.lote") or "Novo"
+                rec.name = self.env["ir.sequence"].next_by_code_sem_repetir("declaracao.lote", "declaracao.lote") or "Novo"
         return self.env.ref("documentos.action_report_declaracao_lote").report_action(self)
 
 

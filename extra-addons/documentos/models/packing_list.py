@@ -184,7 +184,7 @@ class PackingList(models.Model):
     def action_confirm(self):
         for rec in self:
             if rec.name == "Novo":
-                rec.name = self.env["ir.sequence"].next_by_code("packing.list") or "Novo"
+                rec.name = self.env["ir.sequence"].next_by_code_sem_repetir("packing.list", "packing.list") or "Novo"
             rec.state = "confirmed"
 
     def action_reset_draft(self):
@@ -196,7 +196,7 @@ class PackingList(models.Model):
     def action_print_pdf(self):
         for rec in self:
             if rec.name == "Novo":
-                rec.name = self.env["ir.sequence"].next_by_code("packing.list") or "Novo"
+                rec.name = self.env["ir.sequence"].next_by_code_sem_repetir("packing.list", "packing.list") or "Novo"
         return self.env.ref("documentos.action_report_packing_list").report_action(self)
 
 
