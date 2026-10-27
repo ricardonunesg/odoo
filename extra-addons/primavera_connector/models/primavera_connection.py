@@ -1766,6 +1766,8 @@ class PrimaveraConnection(models.Model):
         # Incremental (códigos dados): erro da WebAPI levanta PrimaveraApiError e a
         # marca de última execução não avança — os alterados são tentados outra vez.
         strict = codes is not None
+        inactivos = self._primavera_codigos_inactivos()
+        estados = []
         for code in scan:
             if not self._exists(f"{base_ep}/Existe/{code}", strict=strict):
                 if codes is not None:
@@ -1789,6 +1791,9 @@ class PrimaveraConnection(models.Model):
                 continue
 
             partner = Partner.search([(code_field, "=", code)], limit=1)
+            # Só a ficha que já tem este código (ou criada agora) segue o estado
+            # activo/anulado do Primavera — nunca uma ficha encontrada pelo NIF.
+            ja_tinha_codigo = bool(partner)
             vat = vals.get("vat")
             if not partner and partner_type == "customer":
                 partner = self._find_existing_partner(vat)
@@ -1808,11 +1813,70 @@ class PrimaveraConnection(models.Model):
                 self._safe_write_partner(partner, vals)
                 stats["updated"] += 1
             else:
+                ultimo_id = Partner.search([], order="id desc", limit=1).id
                 self._safe_create_partner(Partner, vals)
                 stats["created"] += 1
+                # Ficha nova (não fundida pelo NIF Dedup numa ficha que já existia)
+                partner = Partner.search([(code_field, "=", code), ("id", ">", ultimo_id)], limit=1)
+                ja_tinha_codigo = bool(partner)
 
+            if ja_tinha_codigo:
+                mudou = self._sync_partner_active(partner, partner_type, self._primavera_inactivo(data), inactivos)
+                if mudou:
+                    estados.append(f"{code} {partner.name} {mudou}")
+
+        if estados:
+            self._log(operation, "success", "[estado] " + "; ".join(estados))
         self._log(operation, "success", self._stats_msg(stats))
         return stats
+
+    @staticmethod
+    def _primavera_inactivo(data):
+        """Cliente/fornecedor anulado no Primavera. A WebAPI indica-o em 'Inactivo'
+        (ClienteAnulado/FornecedorAnulado só existem no SQL)."""
+        return bool(data.get("Inactivo") or data.get("ClienteAnulado") or data.get("FornecedorAnulado"))
+
+    def _primavera_codigos_inactivos(self):
+        """Códigos anulados no Primavera (só leitura), para as fichas cliente+fornecedor.
+        None se o SQL não estiver disponível."""
+        sql_conn = self._sql_connection()
+        if not sql_conn:
+            return None
+        try:
+            with sql_conn.cursor() as cur:
+                cur.execute("SELECT Cliente FROM Clientes WHERE ClienteAnulado = 1")
+                clientes = {r[0].strip() for r in cur.fetchall() if r[0]}
+                cur.execute("SELECT Fornecedor FROM Fornecedores WHERE FornecedorAnulado = 1")
+                fornecedores = {r[0].strip() for r in cur.fetchall() if r[0]}
+            return {"customer": clientes, "supplier": fornecedores}
+        except Exception:
+            return None
+        finally:
+            sql_conn.close()
+
+    def _sync_partner_active(self, partner, partner_type, inactivo, inactivos):
+        """Arquiva/reactiva a ficha conforme o Primavera (desde 27/10/2026). Uma ficha
+        cliente+fornecedor só fica arquivada com os dois códigos anulados (o outro é
+        lido do SQL; sem SQL não se mexe). Ficha ligada a um utilizador do Odoo não é
+        arquivada. Devolve 'arquivada', 'reactivada' ou None."""
+        outro_campo, outro_tipo = (("primavera_supplier_code", "supplier") if partner_type == "customer"
+                                   else ("primavera_customer_code", "customer"))
+        if partner[outro_campo]:
+            if inactivos is None:
+                return None
+            inactivo = inactivo and partner[outro_campo] in inactivos[outro_tipo]
+        if inactivo and partner.active:
+            if self.env["res.users"].sudo().with_context(active_test=False).search_count([("partner_id", "=", partner.id)]):
+                self._log("customers" if partner_type == "customer" else "suppliers", "warning",
+                          _("[estado] %s anulado no Primavera mas não arquivado: ficha ligada a um utilizador do Odoo")
+                          % partner.display_name)
+                return None
+            partner.write({"active": False})
+            return "arquivada"
+        if not inactivo and not partner.active:
+            partner.write({"active": True})
+            return "reactivada"
+        return None
 
     def _sync_ecl_sale_order(self, ecl_name, partner, date_val, data,
                                   incoterm, incoterm_local, pais_id, transitario):
@@ -2048,7 +2112,6 @@ class PrimaveraConnection(models.Model):
             "website": self._clean(data.get("EnderecoWeb")),
             "vat": vat,
             "country_id": self._country_id(data.get("Pais")),
-            "active": not bool(data.get("ClienteAnulado") or data.get("FornecedorAnulado")),
             "comment": self._clean(data.get("Notas")),
             "category_id": [(4, category.id)],
         }
