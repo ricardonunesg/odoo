@@ -16,6 +16,18 @@ from odoo.tools import float_compare, float_round, html2plaintext
 SYNC_FAILURE_ALERT_EMAIL = "goncalo.simoes@mirazeite.com"
 
 
+def vat_ficticio(vat):
+    """NIF que não identifica uma empresa ("MZ0", "BR.", "CN*", "IN999999999"…):
+    sem o prefixo do país fica vazio, com menos de 5 caracteres ou todo igual.
+    Nunca serve para juntar fichas (usado também pelo mirazeite_partner_nif_dedup)."""
+    v = re.sub(r"[^A-Z0-9]", "", (vat or "").upper())
+    if len(v) > 2 and v[:2].isalpha() and not v[2].isalpha():
+        v = v[2:]
+    elif len(v) == 2 and v.isalpha():
+        v = ""
+    return len(v) < 5 or len(set(v)) == 1
+
+
 class PrimaveraApiError(UserError):
     """A WebAPI respondeu com erro (≠ "documento não existe"). No modo rigoroso
     quem chama pára e tenta outra vez mais tarde, em vez de saltar o documento."""
@@ -1796,7 +1808,7 @@ class PrimaveraConnection(models.Model):
             ja_tinha_codigo = bool(partner)
             vat = vals.get("vat")
             if not partner and partner_type == "customer":
-                partner = self._find_existing_partner(vat)
+                partner = self._find_existing_partner(vat, code_field)
 
             if partner:
                 if partner_type == "supplier" and partner.primavera_customer_code:
@@ -2873,8 +2885,11 @@ class PrimaveraConnection(models.Model):
     # UTILIDADES DE PARCEIROS
     # ─────────────────────────────────────────────────────────────────────
 
-    def _find_existing_partner(self, vat):
-        if not vat:
+    def _find_existing_partner(self, vat, code_field=None):
+        """Ficha a aproveitar pelo NIF quando o código ainda não tem ficha. Desde
+        27/10/2026: nunca com NIF fictício e nunca uma ficha que já tenha outro
+        código do mesmo tipo (code_field) — escrevia-se por cima de outro cliente."""
+        if not vat or vat_ficticio(vat):
             return self.env["res.partner"]
         partners = (
             self.env["res.partner"]
@@ -2883,6 +2898,8 @@ class PrimaveraConnection(models.Model):
             .search([("vat", "=", vat)])
         )
         partners = partners.filtered(self._can_reuse_partner)
+        if code_field:
+            partners = partners.filtered(lambda p: not p[code_field])
         return partners if len(partners) == 1 else self.env["res.partner"]
 
     def _can_reuse_partner(self, partner):

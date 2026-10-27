@@ -3,6 +3,8 @@ import logging
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
+from odoo.addons.primavera_connector.models.primavera_connection import vat_ficticio
+
 _logger = logging.getLogger(__name__)
 
 INSTALL_DATE_PARAM = "mirazeite_partner_nif_dedup.install_date"
@@ -68,16 +70,19 @@ class ResPartner(models.Model):
                 "primavera_supplier_code"
             )
             matched = self.env["res.partner"]
-            if vat_norm and prim_code:
+            # NIF fictício ("MZ0", "BR."…) não identifica a empresa: não funde (27/10/2026)
+            if vat_norm and prim_code and not vat_ficticio(raw_vat):
                 base = self.sudo().with_context(active_test=False)
+                # Só fichas de empresa/independentes: os contactos de uma empresa
+                # herdam o NIF dela e não devem receber o código (27/10/2026).
                 # 1ª tentativa: match exacto
                 matched = base.search(
                     [
                         ("vat", "=", raw_vat),
+                        ("parent_id", "=", False),
                         ("primavera_customer_code", "=", False),
                         ("primavera_supplier_code", "=", False),
-                    ],
-                    limit=1,
+                    ]
                 )
                 if not matched:
                     # 2ª tentativa: match normalizado (retira separadores
@@ -87,13 +92,22 @@ class ResPartner(models.Model):
                     candidates = base.search(
                         [
                             ("vat", "!=", False),
+                            ("parent_id", "=", False),
                             ("primavera_customer_code", "=", False),
                             ("primavera_supplier_code", "=", False),
                         ]
                     )
                     matched = candidates.filtered(
                         lambda p: _vat_match_keys(p.vat) & match_keys
-                    )[:1]
+                    )
+                if len(matched) > 1:
+                    # Mais de uma ficha candidata: não se adivinha — cria nova e avisa
+                    _logger.warning(
+                        "[nif_dedup] NIF %r de %s corresponde a %s fichas (%s): "
+                        "não houve fusão, criada ficha nova",
+                        raw_vat, prim_code, len(matched), matched.ids,
+                    )
+                    matched = self.env["res.partner"]
             if matched:
                 _logger.info(
                     "[nif_dedup] Merge Primavera: partner id=%s (%r) promovido "
