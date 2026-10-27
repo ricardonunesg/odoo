@@ -2488,7 +2488,10 @@ class PrimaveraConnection(models.Model):
                         if tax:
                             tax_ids_val = tax.ids
 
-                    lv = {k: v for k, v in lv.items() if v not in (None, False, "")}
+                    # Retira só vazios a sério: com "not in (None, False, '')" um preço ou
+                    # quantidade 0 (0.0 == False) era retirado e o Odoo punha o preço de
+                    # venda do artigo (1 € nas paletes) — corrigido a 27/10/2026, como nas ECLs.
+                    lv = {k: v for k, v in lv.items() if v is not None and v is not False and v != ""}
                     # tax_ids aplicado SEMPRE (inclusive lista vazia) para
                     # sobrepor o default do produto. Deve ir depois do filtro
                     # que remove False.
