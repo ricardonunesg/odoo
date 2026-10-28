@@ -645,6 +645,32 @@ class PrimaveraConnection(models.Model):
         self._ecl_post_change(so, html.escape(_("Anulação desfeita no Primavera — ECL reactivada.")))
         self._log("ecls", "success", _("[notificação] %s: anulação desfeita no Primavera, ECL reactivada.") % so.primavera_ecl_ref)
 
+    def _ecl_trocar_cliente(self, so, partner):
+        """Actualiza o cliente de uma ECL quando foi trocado no Primavera (28/10/2026).
+        Só se a ECL ainda não tiver faturas. Mudam só o cliente e as moradas de
+        faturação/entrega; comercial, equipa, posição fiscal, tabela de preços,
+        documentos e ligações ficam como estão. Sem notificações: o histórico de
+        alterações fica desligado e deixa-se apenas uma nota interna."""
+        if so.invoice_ids or so.primavera_fatura_refs:
+            return False
+        antigo = so.partner_id
+        so.with_context(tracking_disable=True, mail_notrack=True).write({
+            "partner_id": partner.id,
+            "partner_invoice_id": partner.id,
+            "partner_shipping_id": partner.id,
+            "user_id": so.user_id.id,
+            "team_id": so.team_id.id,
+            "fiscal_position_id": so.fiscal_position_id.id,
+            "pricelist_id": so.pricelist_id.id,
+            "payment_term_id": so.payment_term_id.id,
+        })
+        so.message_post(
+            body=Markup(_("Cliente corrigido conforme o Primavera: <b>%s</b> (%s) → <b>%s</b> (%s).")) % (
+                antigo.name, antigo.primavera_customer_code or "-", partner.name, partner.primavera_customer_code or "-"),
+            message_type="comment", subtype_xmlid="mail.mt_note",
+        )
+        return True
+
     def _resync_single_ecl(self, ecl_name, strict=False):
         """Re-sincroniza UMA ECL específica do Primavera para o Odoo.
         Usado pelo botão na sale.order ou por crons de re-sync.
@@ -1919,6 +1945,10 @@ class PrimaveraConnection(models.Model):
         so_vals = {k: v for k, v in so_vals.items() if v not in (None, False, "")}
 
         existing_so = SO.search([("primavera_ecl_ref", "=", ecl_name)], limit=1)
+
+        # Cliente trocado no Primavera depois de a ECL já estar no Odoo (ex.: ECL/2026/427)
+        if existing_so and partner and existing_so.partner_id.commercial_partner_id != partner:
+            self._ecl_trocar_cliente(existing_so, partner)
 
         # ECL anulada no Primavera: reflectir no Odoo sem mexer nas linhas
         if data.get("Anulado"):
