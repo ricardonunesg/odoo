@@ -1,6 +1,6 @@
 {
     "name": "Primavera Connector (WebAPI)",
-    "version": "18.0.2.3.0",
+    "version": "18.0.2.4.0",
     "summary": "Importa clientes, fornecedores, artigos e ECLs do Primavera via WebAPI",
     "category": "Tools",
     "author": "Mirazeite",

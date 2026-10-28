@@ -1,4 +1,5 @@
 from odoo import api, fields, models
+from markupsafe import Markup
 
 
 class AccountMove(models.Model):
@@ -82,19 +83,24 @@ class AccountMoveLine(models.Model):
     volume = fields.Float('Volume (m³)', digits='Volume')
 
     def _peso_liquido_unit(self):
-        """{id da linha: peso líquido unitário (kg)} — o da linha; sem ele, o PesoLiquido
-        do artigo no Primavera, nunca o peso bruto (28/10/2026). Primavera indisponível:
-        o peso do artigo, como antes."""
-        sem = self.filtered(lambda l: not l.peso_liquido and l.product_id.default_code)
-        liquidos = {}
-        if sem:
-            conn = self.env["primavera.connection"].sudo().search([], limit=1)
-            liquidos = conn._primavera_pesos_liquidos(sem.mapped("product_id.default_code")) if conn else None
-        return {
-            l.id: l.peso_liquido or (
-                liquidos.get(l.product_id.default_code, 0.0) if liquidos is not None else l.product_id.weight
-            )
-            for l in self
-        }
+        """{id da linha: peso líquido unitário (kg)} — o da linha do Primavera; sem ele,
+        o Peso Líquido da ficha do artigo. Nunca o peso bruto (28/10/2026)."""
+        return {l.id: l.peso_liquido or l.product_id.primavera_peso_liquido for l in self}
+
+    def _aviso_pesos(self):
+        """Artigos destas linhas com peso bruto ou líquido em falta no Primavera."""
+        return sorted({
+            f"{l.product_id.default_code}: {l.product_id.primavera_aviso_pesos}"
+            for l in self if l.product_id.primavera_aviso_pesos
+        })
+
+    @api.model
+    def _post_aviso_pesos(self, record, lines):
+        """Aviso no histórico do documento: os pesos em falta não entram nos totais."""
+        avisos = lines._aviso_pesos()
+        if avisos:
+            record.message_post(body=Markup(
+                "<p><b>Atenção — pesos em falta no Primavera</b> (não entram nos totais; corrigir no Primavera):</p><ul>%s</ul>"
+            ) % Markup("").join(Markup("<li>%s</li>") % a for a in avisos))
     caixas = fields.Integer('Caixas')
     unidades_linha = fields.Float('Unidades Totais', digits=(16, 2))

@@ -151,6 +151,7 @@ class CertificadoSalubridade(models.Model):
             return {"type": "ir.actions.client", "tag": "reload"}
 
         liquido = inv_lines._peso_liquido_unit()
+        self.env["account.move.line"]._post_aviso_pesos(self, inv_lines)
 
         # ── Agrupar por prefixo de lote — só prefixos reconhecidos ──────────
         grupos = {}

@@ -224,6 +224,7 @@ class CertificadoNarrativoAbstract(models.AbstractModel):
         # Totais
         self.total_caixas = sum(l.caixas or int(l.quantity) for l in lines)
         liquido = lines._peso_liquido_unit()
+        self.env["account.move.line"]._post_aviso_pesos(self, lines)
         self.peso_liquido_total = sum(
             (l.caixas or int(l.quantity)) * liquido[l.id]
             for l in lines

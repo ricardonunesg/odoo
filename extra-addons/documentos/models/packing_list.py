@@ -179,6 +179,7 @@ class PackingList(models.Model):
             })
         if vals_list:
             self.env["packing.list.line"].create(vals_list)
+        self.env["account.move.line"]._post_aviso_pesos(self, linhas)
         return {"type": "ir.actions.client", "tag": "reload"}
 
     def action_confirm(self):

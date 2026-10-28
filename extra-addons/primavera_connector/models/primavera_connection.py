@@ -1968,8 +1968,8 @@ class PrimaveraConnection(models.Model):
                     "peso_liquido": art_data.get("PesoLiquido") or 0.0 if art_data else 0.0,
                 }
             art_info = artigo_cache.get(artigo, {})
-            # Peso líquido: o da linha; sem ele, o do artigo — nunca o bruto
-            peso_liq = peso_liq or art_info.get("peso_liquido", 0.0)
+            # Peso líquido: o da linha; sem ele, o da ficha do artigo — nunca o bruto
+            peso_liq = peso_liq or (product.primavera_peso_liquido if product else 0.0) or art_info.get("peso_liquido", 0.0)
 
             line_vals = {
                 "name": desc or "—",
@@ -2528,8 +2528,6 @@ class PrimaveraConnection(models.Model):
                             "peso_liquido": art_data.get("PesoLiquido") or 0.0 if art_data else 0.0,
                         }
                     art_info = artigo_cache.get(artigo, {})
-                    # Peso líquido: o da linha; sem ele, o do artigo — nunca o bruto
-                    peso_liq = peso_liq or art_info.get("peso_liquido", 0.0)
 
                     # Validade: já pré-carregada do SQL Server; fallback individual se cache vazio
                     data_val_raw = None
@@ -2540,6 +2538,8 @@ class PrimaveraConnection(models.Model):
                         data_val_raw = lote_cache[_key]
 
                     product = Product.search([("default_code", "=", artigo)], limit=1) if artigo else Product
+                    # Peso líquido: o da linha; sem ele, o da ficha do artigo — nunca o bruto
+                    peso_liq = peso_liq or (product.primavera_peso_liquido if product else 0.0) or art_info.get("peso_liquido", 0.0)
 
                     lv = {
                         "name": desc,
@@ -2669,7 +2669,7 @@ class PrimaveraConnection(models.Model):
     _PRODUCT_SKIP_CODES = {"TESTE57"}  # artigo de teste do Primavera (decisão do user)
     _PRODUCT_SQL_COLUMNS = (
         "Artigo, Descricao, ArtigoAnulado, UnidadeBase, UnidadeVenda, UnidadeCompra, "
-        "Peso, Volume, CodBarras, Observacoes"
+        "Peso, PesoLiquido, Volume, CodBarras, Observacoes"
     )
 
     def _product_sync_key(self, name):
@@ -2708,7 +2708,8 @@ class PrimaveraConnection(models.Model):
             "default_code": code,
             "primavera_code": code,
             "active": not row["ArtigoAnulado"],
-            "weight": row["Peso"] or 0.0,
+            "weight": row["Peso"] or 0.0,  # peso bruto
+            "primavera_peso_liquido": row["PesoLiquido"] or 0.0,
             "volume": row["Volume"] or 0.0,
         }
         if uom_venda:
@@ -3076,32 +3077,6 @@ class PrimaveraConnection(models.Model):
             except Exception:
                 pass
         return ecls
-
-    def _primavera_pesos_liquidos(self, codes):
-        """{artigo: PesoLiquido (kg)} do Primavera, para linhas sem peso líquido
-        (Packing Lists, boletins, certificados). SQL só leitura; sem SQL, WebAPI.
-        None se o Primavera não estiver disponível."""
-        codes = sorted({c for c in codes if c})
-        if not codes:
-            return {}
-        sql_conn = self._sql_connection()
-        if sql_conn:
-            try:
-                with sql_conn.cursor() as cur:
-                    marks = ",".join(["%s"] * len(codes))
-                    cur.execute(f"SELECT Artigo, PesoLiquido FROM Artigo WHERE Artigo IN ({marks})", tuple(codes))
-                    return {r[0].strip(): r[1] or 0.0 for r in cur.fetchall()}
-            except Exception:
-                pass  # SQL falhou: tenta a WebAPI
-            finally:
-                sql_conn.close()
-        out = {}
-        for code in codes:
-            data = self._edita(f"/v2/Base/Artigos/Edita/{code}")
-            if data is None:
-                return None
-            out[code] = data.get("PesoLiquido") or 0.0
-        return out
 
     def _lote_data_validade(self, filial, artigo, lote):
         """Obtém a data de validade de um lote a partir de dbo.ArtigoLote via SQL Server."""

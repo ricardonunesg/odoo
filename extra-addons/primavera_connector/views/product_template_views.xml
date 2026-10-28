@@ -8,6 +8,34 @@
             <xpath expr="//field[@name='name']" position="after">
                 <field name="primavera_code"/>
             </xpath>
+            <xpath expr="//div[hasclass('oe_title')]" position="before">
+                <div class="alert alert-warning" role="alert" invisible="not primavera_aviso_pesos">
+                    <field name="primavera_aviso_pesos" readonly="1"/>
+                </div>
+            </xpath>
+            <xpath expr="//label[@for='weight']" position="attributes">
+                <attribute name="string">Peso bruto</attribute>
+            </xpath>
+            <xpath expr="//div[@name='weight']" position="after">
+                <label for="primavera_peso_liquido" invisible="product_variant_count &gt; 1 and not is_product_variant"/>
+                <div class="o_row" name="primavera_peso_liquido" invisible="product_variant_count &gt; 1 and not is_product_variant">
+                    <field name="primavera_peso_liquido" class="oe_inline" readonly="1"/>
+                    <span>kg</span>
+                </div>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_product_template_search_primavera_pesos" model="ir.ui.view">
+        <field name="name">product.template.search.primavera.pesos</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_search_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='filter_to_sell']" position="before">
+                <filter string="Pesos incompletos no Primavera" name="primavera_pesos_incompletos"
+                        domain="[('primavera_aviso_pesos', '!=', False)]"/>
+                <separator/>
+            </xpath>
         </field>
     </record>
 </odoo>
