@@ -1,0 +1,65 @@
+restauro c0=0
+restauro c1=0
+6
+===== produção actual
+R versão: produção actual
+R C1 PL PL/2026/0001 draft | fatura FA/2026/171 | ANTES: líquido 16733.628 bruto 21090.919
+R    C1 depois de recarregar: TP.001.10.00500.02 | caixas 96 | líquido/cx 12.866 | bruto/cx 12.866 | líquido linha 1235.136 | bruto linha 1235.136
+R    C1 depois de recarregar: OLIV.001.01.00350.01 | caixas 252 | líquido/cx 10.68 | bruto/cx 10.68 | líquido linha 2691.36 | bruto linha 2691.36
+R    C1 depois de recarregar: OLIV.001.02.00350.01 | caixas 252 | líquido/cx 10.68 | bruto/cx 10.68 | líquido linha 2691.36 | bruto linha 2691.36
+R    C1 depois de recarregar: TOTAL PL líquido 16733.244 kg | bruto 21090.919 kg | volume 32.0911 m³ | caixas 1865
+R C2 Primavera indisponível → líquido OLIV/cx: 10.68 | total líquido 16733.244
+R C3 reimportação FA/2026/171: {'created': 0, 'updated': 1, 'skipped': 0, '_last': 171} | estado draft
+R    AZ.002.01.00500.01 | qtd 96.0 | caixas 96 | líquido/cx 6.87 (Primavera artigo 6.87) | bruto/cx 12.866 (artigo 12.866) | líquido linha 659.52
+R    AZ.002.01.01000.02 | qtd 120.0 | caixas 120 | líquido/cx 10.992 (Primavera artigo 10.992) | bruto/cx 11.762 (artigo 11.762) | líquido linha 1319.04
+R    AZ.001.01.00500.01 | qtd 192.0 | caixas 192 | líquido/cx 6.87 (Primavera artigo 6.87) | bruto/cx 12.866 (artigo 12.866) | líquido linha 1319.04
+R    AZ.002.01.00250.01 | qtd 180.0 | caixas 180 | líquido/cx 2.748 (Primavera artigo 2.748) | bruto/cx 6.062 (artigo 6.062) | líquido linha 494.64
+R    AZ.001.01.00250.01 | qtd 180.0 | caixas 180 | líquido/cx 2.748 (Primavera artigo 2.748) | bruto/cx 6.062 (artigo 6.062) | líquido linha 494.64
+R    AZ.002.01.05000.02 | qtd 104.0 | caixas 104 | líquido/cx 13.74 (Primavera artigo 13.74) | bruto/cx 14.248 (artigo 14.248) | líquido linha 1428.96
+R    AZ.002.04.01000.02 | qtd 70.0 | caixas 70 | líquido/cx 10.992 (Primavera artigo 10.992) | bruto/cx 12.79 (artigo 12.79) | líquido linha 769.44
+R    TP.001.10.00500.02 | qtd 96.0 | caixas 96 | líquido/cx 0.0 (Primavera artigo 6.87) | bruto/cx 12.866 (artigo 12.866) | líquido linha 0.0
+R    TP.001.10.00750.01 | qtd 75.0 | caixas 75 | líquido/cx 8.244 (Primavera artigo 8.244) | bruto/cx 14.369 (artigo 14.369) | líquido linha 618.3
+R    TP.001.10.05000.02 | qtd 104.0 | caixas 104 | líquido/cx 13.74 (Primavera artigo 13.74) | bruto/cx 14.248 (artigo 14.248) | líquido linha 1428.96
+R    TP.001.10.03000.01 | qtd 144.0 | caixas 144 | líquido/cx 10.992 (Primavera artigo 10.992) | bruto/cx 11.544 (artigo 11.544) | líquido linha 1582.848
+R    OLIV.001.01.00350.01 | qtd 252.0 | caixas 252 | líquido/cx 0.0 (Primavera artigo 6.96) | bruto/cx 10.68 (artigo 10.68) | líquido linha 0.0
+R    OLIV.001.02.00350.01 | qtd 252.0 | caixas 252 | líquido/cx 0.0 (Primavera artigo 6.96) | bruto/cx 10.68 (artigo 10.68) | líquido linha 0.0
+R    PAL.1200.0800.02 | qtd 23.0 | caixas 0 | líquido/cx 25.0 (Primavera artigo 0.0) | bruto/cx 25.0 (artigo 25.0) | líquido linha 575.0
+R C3 TOTAIS FA/2026/171: líquido 10115.388 | bruto 21090.919 | volume 32.068
+R    C3 PL recarregada: TP.001.10.00500.02 | caixas 96 | líquido/cx 12.866 | bruto/cx 12.866 | líquido linha 1235.136 | bruto linha 1235.136
+R    C3 PL recarregada: OLIV.001.01.00350.01 | caixas 252 | líquido/cx 10.68 | bruto/cx 10.68 | líquido linha 2691.36 | bruto linha 2691.36
+R    C3 PL recarregada: OLIV.001.02.00350.01 | caixas 252 | líquido/cx 10.68 | bruto/cx 10.68 | líquido linha 2691.36 | bruto linha 2691.36
+R    C3 PL recarregada: TOTAL PL líquido 16733.244 kg | bruto 21090.919 kg | volume 32.0679 m³ | caixas 1865
+Traceback (most recent call last):
+AttributeError: 'bool' object has no attribute 'startswith'
+===== proposta C
+R versão: PROPOSTA C
+R C1 PL PL/2026/0001 draft | fatura FA/2026/171 | ANTES: líquido 16733.628 bruto 21090.919
+R    C1 depois de recarregar: TP.001.10.00500.02 | caixas 96 | líquido/cx 6.87 | bruto/cx 12.866 | líquido linha 659.52 | bruto linha 1235.136
+R    C1 depois de recarregar: OLIV.001.01.00350.01 | caixas 252 | líquido/cx 6.96 | bruto/cx 10.68 | líquido linha 1753.92 | bruto linha 2691.36
+R    C1 depois de recarregar: OLIV.001.02.00350.01 | caixas 252 | líquido/cx 6.96 | bruto/cx 10.68 | líquido linha 1753.92 | bruto linha 2691.36
+R    C1 depois de recarregar: TOTAL PL líquido 14282.748 kg | bruto 21090.919 kg | volume 32.0911 m³ | caixas 1865
+R C2 Primavera indisponível → líquido OLIV/cx: 10.68 | total líquido 16733.244
+R C3 reimportação FA/2026/171: {'created': 0, 'updated': 1, 'skipped': 0, '_last': 171} | estado draft
+R    AZ.002.01.00500.01 | qtd 96.0 | caixas 96 | líquido/cx 6.87 (Primavera artigo 6.87) | bruto/cx 12.866 (artigo 12.866) | líquido linha 659.52
+R    AZ.002.01.01000.02 | qtd 120.0 | caixas 120 | líquido/cx 10.992 (Primavera artigo 10.992) | bruto/cx 11.762 (artigo 11.762) | líquido linha 1319.04
+R    AZ.001.01.00500.01 | qtd 192.0 | caixas 192 | líquido/cx 6.87 (Primavera artigo 6.87) | bruto/cx 12.866 (artigo 12.866) | líquido linha 1319.04
+R    AZ.002.01.00250.01 | qtd 180.0 | caixas 180 | líquido/cx 2.748 (Primavera artigo 2.748) | bruto/cx 6.062 (artigo 6.062) | líquido linha 494.64
+R    AZ.001.01.00250.01 | qtd 180.0 | caixas 180 | líquido/cx 2.748 (Primavera artigo 2.748) | bruto/cx 6.062 (artigo 6.062) | líquido linha 494.64
+R    AZ.002.01.05000.02 | qtd 104.0 | caixas 104 | líquido/cx 13.74 (Primavera artigo 13.74) | bruto/cx 14.248 (artigo 14.248) | líquido linha 1428.96
+R    AZ.002.04.01000.02 | qtd 70.0 | caixas 70 | líquido/cx 10.992 (Primavera artigo 10.992) | bruto/cx 12.79 (artigo 12.79) | líquido linha 769.44
+R    TP.001.10.00500.02 | qtd 96.0 | caixas 96 | líquido/cx 6.87 (Primavera artigo 6.87) | bruto/cx 12.866 (artigo 12.866) | líquido linha 659.52
+R    TP.001.10.00750.01 | qtd 75.0 | caixas 75 | líquido/cx 8.244 (Primavera artigo 8.244) | bruto/cx 14.369 (artigo 14.369) | líquido linha 618.3
+R    TP.001.10.05000.02 | qtd 104.0 | caixas 104 | líquido/cx 13.74 (Primavera artigo 13.74) | bruto/cx 14.248 (artigo 14.248) | líquido linha 1428.96
+R    TP.001.10.03000.01 | qtd 144.0 | caixas 144 | líquido/cx 10.992 (Primavera artigo 10.992) | bruto/cx 11.544 (artigo 11.544) | líquido linha 1582.848
+R    OLIV.001.01.00350.01 | qtd 252.0 | caixas 252 | líquido/cx 6.96 (Primavera artigo 6.96) | bruto/cx 10.68 (artigo 10.68) | líquido linha 1753.92
+R    OLIV.001.02.00350.01 | qtd 252.0 | caixas 252 | líquido/cx 6.96 (Primavera artigo 6.96) | bruto/cx 10.68 (artigo 10.68) | líquido linha 1753.92
+R    PAL.1200.0800.02 | qtd 23.0 | caixas 0 | líquido/cx 25.0 (Primavera artigo 0.0) | bruto/cx 25.0 (artigo 25.0) | líquido linha 575.0
+R C3 TOTAIS FA/2026/171: líquido 14282.748 | bruto 21090.919 | volume 32.068
+R    C3 PL recarregada: TP.001.10.00500.02 | caixas 96 | líquido/cx 6.87 | bruto/cx 12.866 | líquido linha 659.52 | bruto linha 1235.136
+R    C3 PL recarregada: OLIV.001.01.00350.01 | caixas 252 | líquido/cx 6.96 | bruto/cx 10.68 | líquido linha 1753.92 | bruto linha 2691.36
+R    C3 PL recarregada: OLIV.001.02.00350.01 | caixas 252 | líquido/cx 6.96 | bruto/cx 10.68 | líquido linha 1753.92 | bruto linha 2691.36
+R    C3 PL recarregada: TOTAL PL líquido 14282.748 kg | bruto 21090.919 kg | volume 32.0679 m³ | caixas 1865
+Traceback (most recent call last):
+AttributeError: 'bool' object has no attribute 'startswith'
+
+[exited with code 0]

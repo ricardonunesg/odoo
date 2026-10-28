@@ -32,7 +32,7 @@ FA/2026/176 — IVA 23% no Odoo vs 6% no Primavera desde a importação (Maio); 
 3. ~~Descontos~~ — aplicado 27/10/2026.
 4. ~~Clientes/fornecedores anulados~~ — aplicado 27/10/2026 (FO0160 e FO0792 arquivados).
 5. ~~Fichas sobrescritas por NIF partilhado~~ — aplicado 28/10/2026 (correcção alargada: cliente↔fornecedor na mesma ficha; 7 fichas novas 3820–3826).
-6. Casas decimais do peso (3 ou 5).
+6. ~~Casas decimais do peso~~ — alteração A aplicada 28/10/2026 12:33 (linhas de documentos 5 casas peso / 9 volume). C (peso líquido) testada, por autorizar.
 
 ## Outros
 - Packing Lists antigas com modo de transporte "Outro" (fora da lista) — botão Duplicar falha.
@@ -45,3 +45,11 @@ FA/2026/176 — IVA 23% no Odoo vs 6% no Primavera desde a importação (Maio); 
 - Empresas com ficha de cliente e ficha de fornecedor separadas (antes da correcção): GARLAND (CL0905 ficha 3566 / FO0220 ficha 2853),
   RAMAGPLAST (CL0909 3624 / FO0858 3449), RCINOXSERVE (CL0841 2594 / FO0877 3573) — não juntar agora.
 - Ficha MIRAZEITE, SA (CL0000, 1725): morada com 2.ª linha no Odoo; a volta nunca passa no CL0000 (começa em CL0001) — sem efeito, só registo.
+
+## Do ponto 6 (28/10/2026) — não alterado, para decisão
+- Documentos antigos NÃO corrigidos (decisão do user): faturas Odoo são cópias em rascunho do Primavera; 12 com diferença ≥0,5 % (maior FAT/2026/440 +2,9 %, FA/2026/301 −26,46 kg); 9 PL confirmadas com ≤0,15 % de diferença.
+- PL/2026/0001 (id 36, FA/2026/171, rascunho) e "Novo" (id 35): peso líquido das OLIV = bruto (+1.874,88 kg). Corrige-se ao recarregar a PL depois da alteração C.
+- 19 ECLs anuladas (34 linhas) ficam com pesos arredondados: a re-sync não mexe nas linhas de ECLs anuladas.
+- Primavera: 132 artigos activos com PesoLiquido mas sem Peso (bruto) — ex. EMB.01.021.10000.40, EMB.01.002.01000.01 → peso bruto 0 nos documentos (FAT/2026/47: líquido > bruto). Corrigir no Primavera.
+- Primavera: linhas de ECL com peso líquido escrito igual ao bruto (ECL/2026/539, 537, 498, 449, 434, 377, 355) — corrigir no Primavera se for engano.
+- Certificado de qualidade soma as paletes no peso líquido total (ex. +575 kg na FA/2026/171) — PL, boletins e certificado de salubridade excluem-nas. Já era assim.
