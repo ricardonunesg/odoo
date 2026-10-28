@@ -650,7 +650,8 @@ class PrimaveraConnection(models.Model):
         Só se a ECL ainda não tiver faturas. Mudam só o cliente e as moradas de
         faturação/entrega; comercial, equipa, posição fiscal, tabela de preços,
         documentos e ligações ficam como estão. Sem notificações: o histórico de
-        alterações fica desligado e deixa-se apenas uma nota interna."""
+        alterações fica desligado e fica só um registo no histórico, que não
+        notifica ninguém (uma nota interna notificava os seguidores)."""
         if so.invoice_ids or so.primavera_fatura_refs:
             return False
         antigo = so.partner_id
@@ -661,14 +662,10 @@ class PrimaveraConnection(models.Model):
             "user_id": so.user_id.id,
             "team_id": so.team_id.id,
             "fiscal_position_id": so.fiscal_position_id.id,
-            "pricelist_id": so.pricelist_id.id,
             "payment_term_id": so.payment_term_id.id,
         })
-        so.message_post(
-            body=Markup(_("Cliente corrigido conforme o Primavera: <b>%s</b> (%s) → <b>%s</b> (%s).")) % (
-                antigo.name, antigo.primavera_customer_code or "-", partner.name, partner.primavera_customer_code or "-"),
-            message_type="comment", subtype_xmlid="mail.mt_note",
-        )
+        so._message_log(body=Markup(_("Cliente corrigido conforme o Primavera: <b>%s</b> (%s) → <b>%s</b> (%s).")) % (
+            antigo.name, antigo.primavera_customer_code or "-", partner.name, partner.primavera_customer_code or "-"))
         return True
 
     def _resync_single_ecl(self, ecl_name, strict=False):
