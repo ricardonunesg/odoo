@@ -1088,12 +1088,7 @@ class PrimaveraConnection(models.Model):
     # mais de _VERIFY_FATURAS_MAX_IMPORT não importa nada e só avisa (algo de
     # anormal). Só no Odoo → só reporta. Avisa os destinatários das
     # notificações de ECL só quando há alguma coisa.
-    # Desde 28/10/2026 compara também o IVA e o total de cada fatura (as faturas
-    # importadas de 30/04 a 20/05/2026 tinham ficado com a taxa errada sem ninguém
-    # dar por isso): diferente numa fatura em rascunho (cópia do Primavera) →
-    # reimportada; lançada → só avisa. Os cêntimos de arredondamento não contam.
     _VERIFY_FATURAS_MAX_IMPORT = 20
-    _VERIFY_FATURAS_TOLERANCIA = 0.05
 
     def _verify_faturas(self):
         self.ensure_one()
@@ -1110,17 +1105,15 @@ class PrimaveraConnection(models.Model):
         try:
             with sql_conn.cursor() as cur:
                 cur.execute(
-                    "SELECT cd.TipoDoc, cd.Serie, cd.NumDoc, cd.Nome, cd.TotalIva, cd.TotalDocumento, "
-                    "ISNULL(cs.Anulado, 0) FROM CabecDoc cd LEFT JOIN CabecDocStatus cs ON cs.IdCabecDoc = cd.Id "
-                    f"WHERE cd.TipoDoc IN ({','.join(['%s'] * len(tipos))}) "
-                    f"AND cd.Serie IN ({','.join(['%s'] * len(series))})",
+                    "SELECT TipoDoc, Serie, NumDoc, Nome FROM CabecDoc "
+                    f"WHERE TipoDoc IN ({','.join(['%s'] * len(tipos))}) "
+                    f"AND Serie IN ({','.join(['%s'] * len(series))})",
                     tuple(tipos) + tuple(series),
                 )
                 prim = {}
-                for tipo, serie, num, nome, iva, total, anulado in cur.fetchall():
+                for tipo, serie, num, nome in cur.fetchall():
                     tipo, serie = tipo.strip(), serie.strip()
-                    prim[f"{tipo}/{serie}/{num}"] = (tipo, serie, int(num), nome or "",
-                                                     float(iva or 0), float(total or 0), bool(anulado))
+                    prim[f"{tipo}/{serie}/{num}"] = (tipo, serie, int(num), nome or "")
         finally:
             sql_conn.close()
 
@@ -1133,7 +1126,7 @@ class PrimaveraConnection(models.Model):
                              "automaticamente por serem demasiadas; verificar.") % (len(faltam), ", ".join(faltam[:5])))
         else:
             for ref in faltam:
-                tipo, serie, num, nome = prim[ref][:4]
+                tipo, serie, num, nome = prim[ref]
                 self._import_faturas_doc(tipo, serie, num - 1, 1, 1, None)
                 if AM.search_count([("primavera_ref", "=", ref)]):
                     corrigido.append(_("%s — %s: faltava no Odoo; importada") % (ref, nome))
@@ -1142,44 +1135,14 @@ class PrimaveraConnection(models.Model):
         for ref in sorted(odoo - set(prim)):
             atencao.append(_("%s: existe no Odoo mas não no Primavera") % ref)
 
-        # IVA e total iguais aos do Primavera
-        ICP = self.env["ir.config_parameter"].sudo()
-        k_rep = f"primavera_connector.fatura_verif_reportados.{self.id}"
-        ja = set(filter(None, (ICP.get_param(k_rep) or "").split("\n")))
-        tol = self._VERIFY_FATURAS_TOLERANCIA
-        moves = {m.primavera_ref: m for m in AM.search([("primavera_ref", "in", list(prim))])}
-
-        def difere(ref):
-            m, p = moves.get(ref), prim[ref]
-            return bool(m) and not p[6] and (abs(m.amount_tax - p[4]) > tol or abs(m.amount_total - p[5]) > tol)
-
-        diferentes = sorted((r for r in prim if difere(r)), key=lambda k: (prim[k][0], prim[k][1], prim[k][2]))
-        if len(diferentes) > self._VERIFY_FATURAS_MAX_IMPORT:
-            atencao.append(_("%s faturas com IVA/total diferentes do Primavera (ex.: %s) — não foram reimportadas "
-                             "automaticamente por serem demasiadas; verificar.") % (len(diferentes), ", ".join(diferentes[:5])))
-        else:
-            for ref in diferentes:
-                tipo, serie, num, nome, iva_p, total_p, _anulado = prim[ref]
-                m = moves[ref]
-                iva_antes = m.amount_tax
-                # já avisada antes e não corrigida: não volta a reimportar todos os dias
-                avisada = any(a.startswith(f"{ref} — ") and "IVA/total" in a for a in ja)
-                if m.state == "draft" and not avisada:
-                    self._import_faturas_doc(tipo, serie, num - 1, 1, 1, None)
-                    m.invalidate_recordset()
-                if not difere(ref):
-                    corrigido.append(_("%s — %s: IVA diferente do Primavera (%.2f € → %.2f €); reimportada") % (
-                        ref, nome, iva_antes, m.amount_tax))
-                else:
-                    atencao.append(_("%s — %s: IVA/total diferentes do Primavera (Odoo %.2f / %.2f €, Primavera %.2f / %.2f €)%s") % (
-                        ref, nome, m.amount_tax, m.amount_total, iva_p, total_p,
-                        "" if m.state == "draft" else _(" — fatura lançada, não alterada")))
-
-        resumo = _("[verificação] %s fatura(s) comparadas; %s corrigida(s); %s a precisar de atenção.") % (
+        resumo = _("[verificação] %s fatura(s) comparadas; %s importada(s); %s a precisar de atenção.") % (
             len(prim), len(corrigido), len(atencao))
         self._log("faturas", "error" if atencao else "success",
                   (resumo + " " + " | ".join(atencao))[:900] if atencao else resumo)
         # Avisos "a precisar de atenção" só são notificados uma vez (até mudarem)
+        ICP = self.env["ir.config_parameter"].sudo()
+        k_rep = f"primavera_connector.fatura_verif_reportados.{self.id}"
+        ja = set(filter(None, (ICP.get_param(k_rep) or "").split("\n")))
         ICP.set_param(k_rep, "\n".join(sorted(atencao)) or False)
         atencao = [a for a in atencao if a not in ja]
         if not (corrigido or atencao):
@@ -1195,7 +1158,7 @@ class PrimaveraConnection(models.Model):
         if partners:
             partners[:1].message_notify(
                 partner_ids=partners.ids,
-                subject=f"Verificação das faturas: {len(corrigido)} corrigida(s), {len(atencao)} a ver",
+                subject=f"Verificação das faturas: {len(corrigido)} importada(s), {len(atencao)} a ver",
                 body=Markup(body),
             )
 
