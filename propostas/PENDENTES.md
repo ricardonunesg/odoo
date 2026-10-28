@@ -32,7 +32,7 @@ FA/2026/176 — IVA 23% no Odoo vs 6% no Primavera desde a importação (Maio); 
 3. ~~Descontos~~ — aplicado 27/10/2026.
 4. ~~Clientes/fornecedores anulados~~ — aplicado 27/10/2026 (FO0160 e FO0792 arquivados).
 5. ~~Fichas sobrescritas por NIF partilhado~~ — aplicado 28/10/2026 (correcção alargada: cliente↔fornecedor na mesma ficha; 7 fichas novas 3820–3826).
-6. ~~Casas decimais do peso~~ — alteração A aplicada 28/10/2026 12:33 (linhas de documentos 5 casas peso / 9 volume). C (peso líquido) testada, por autorizar.
+6. ~~Casas decimais do peso~~ — alteração A aplicada 28/10/2026 12:33 (linhas de documentos 5 casas peso / 9 volume). Peso líquido integrado aplicado 28/10/2026 14:11 (primavera_connector 18.0.2.4.0 com -u).
 
 ## Outros
 - Packing Lists antigas com modo de transporte "Outro" (fora da lista) — botão Duplicar falha.
@@ -53,3 +53,7 @@ FA/2026/176 — IVA 23% no Odoo vs 6% no Primavera desde a importação (Maio); 
 - Primavera: 132 artigos activos com PesoLiquido mas sem Peso (bruto) — ex. EMB.01.021.10000.40, EMB.01.002.01000.01 → peso bruto 0 nos documentos (FAT/2026/47: líquido > bruto). Corrigir no Primavera.
 - Primavera: linhas de ECL com peso líquido escrito igual ao bruto (ECL/2026/539, 537, 498, 449, 434, 377, 355) — corrigir no Primavera se for engano.
 - Certificado de qualidade soma as paletes no peso líquido total (ex. +575 kg na FA/2026/171) — PL, boletins e certificado de salubridade excluem-nas. Já era assim.
+
+## Do peso líquido (28/10/2026)
+- PL/2026/0001 (id 36) e "Novo" (id 35) NÃO recarregadas — decisão do Gonçalo à parte (recarregar → líquido 16.733,628 → 14.282,748 kg).
+- Primavera: preencher Peso (bruto) nos 132 artigos assinalados ("Pesos incompletos no Primavera") e PesoLiquido em DIV.0002, DIV.0003, MERC.0005, MERC.0006.
