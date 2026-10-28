@@ -31,9 +31,17 @@ FA/2026/176 — IVA 23% no Odoo vs 6% no Primavera desde a importação (Maio); 
 ## Pontos já combinados, por ordem
 3. ~~Descontos~~ — aplicado 27/10/2026.
 4. ~~Clientes/fornecedores anulados~~ — aplicado 27/10/2026 (FO0160 e FO0792 arquivados).
-5. Fichas sobrescritas pela volta nocturna por NIF partilhado (MARIN TRADING e outras 4).
+5. ~~Fichas sobrescritas por NIF partilhado~~ — aplicado 28/10/2026 (correcção alargada: cliente↔fornecedor na mesma ficha; 7 fichas novas 3820–3826).
 6. Casas decimais do peso (3 ou 5).
 
 ## Outros
 - Packing Lists antigas com modo de transporte "Outro" (fora da lista) — botão Duplicar falha.
 - Numeração dos documentos não recomeça por ano.
+
+## Do ponto 5 (28/10/2026) — decisões do user: não mexer agora
+- Histórico: as 4.597 alterações falsas antigas (MARIN 1754, HEBRUMEL 1851, …) ficam como estão — não apagar.
+- Códigos duplicados no Primavera (CL0027/CL0056/CL0062 com NIF MZ0, CL0109↔CL0128, CL0119↔CL0137, CL0171↔CL0181, CL0455↔CL0760): não anular; análise posterior.
+- ECL/2026/427: entidade CL0647 no Primavera, CL0001 no Odoo — investigar à parte, sem alterar.
+- Empresas com ficha de cliente e ficha de fornecedor separadas (antes da correcção): GARLAND (CL0905 ficha 3566 / FO0220 ficha 2853),
+  RAMAGPLAST (CL0909 3624 / FO0858 3449), RCINOXSERVE (CL0841 2594 / FO0877 3573) — não juntar agora.
+- Ficha MIRAZEITE, SA (CL0000, 1725): morada com 2.ª linha no Odoo; a volta nunca passa no CL0000 (começa em CL0001) — sem efeito, só registo.
