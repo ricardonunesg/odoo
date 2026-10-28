@@ -1,0 +1,96 @@
+restauro u=0
+restauro r=0
+rede bloqueada: 6/6
+===== 1. fotografia antes
+OK /home/odoo/.claude/jobs/738b98e4/tmp/p6d_antes.txt
+===== 2. -u primavera_connector com a proposta
+saída=0
+8
+2026-10-28 13:22:52,553 1 INFO u odoo.modules.loading: updating modules list 
+2026-10-28 13:23:13,566 1 INFO u odoo.modules.loading: Modules loaded. 
+===== 3. fotografia depois e diferenças
+OK /home/odoo/.claude/jobs/738b98e4/tmp/p6d_depois.txt
+[contagem] 1 diferença(s)
+  ~ ir_model_fields: 12377  →  12381
+[ecra] 2 diferença(s)
+  ~ 4011: product.template.form.primavera.connector / product.template / 1144 / 16 / extension / t / 0d2fbd47191721c4f6e7841bab09bca9  →  product.template.form.primavera.connector / product.template / 1144 / 16 / extension / t / d0d96c774bf346249945f118e502cf7c
+  + 4377: product.template.search.primavera.pesos / product.template / 1145 / 16 / extension / t / 6b1ec97569af46b241860fe5250bb1c0
+[imd] 8 diferença(s)
+  + documentos.model_ir_sequence: ir.model / 12 / f
+  + primavera_connector.field_product_product__primavera_aviso_pesos: ir.model.fields / 28829 / f
+  + primavera_connector.field_product_product__primavera_peso_liquido: ir.model.fields / 28828 / f
+  + primavera_connector.field_product_template__primavera_aviso_pesos: ir.model.fields / 28827 / f
+  + primavera_connector.field_product_template__primavera_peso_liquido: ir.model.fields / 28826 / f
+  + primavera_connector.selection__primavera_sync_log__operation__employees: ir.model.fields.selection / 5587 / f
+  + primavera_connector.selection__primavera_sync_log__operation__validacao_prep_graso: ir.model.fields.selection / 5592 / f
+  + primavera_connector.view_product_template_search_primavera_pesos: ir.ui.view / 4377 / f
+pesos/volumes de documentos e artigos alterados pela actualização: 0
+===== 4. ensaio funcional
+R F1 sync artigos: {'created': 0, 'updated': 428, 'skipped': 1}
+R PASS | F1 peso líquido igual ao Primavera em todos os artigos (incl. 4–5 casas) 
+R PASS | F1 peso bruto e volume continuam iguais ao Primavera | ([], [])
+R F1 exemplos (artigo, bruto, líquido, volume): [('OLIV.001.01.00350.01', 10.68, 6.96, 0.01296), ('TP.001.10.00500.02', 12.866, 6.87, 0.0157), ('CAPS.29.02.02.10', 0.00383, 0.00354, 2.3e-05), ('EMB.01.014.05000.01', 0.14203, 0.084, 0.009333), ('ASA.36.01.10', 0.0, 0.0051, 0.0)]
+R PASS | F1 segunda volta: nenhum artigo regravado | {'created': 0, 'updated': 0, 'skipped': 1}
+R F2 avisos: sem peso bruto 132 | sem peso líquido 4 ['MERC.0005', 'MERC.0006', 'DIV.0003', 'DIV.0002']
+R PASS | F2 os 132 artigos com líquido e sem bruto ficam assinalados (activos) | 132
+R PASS | F2 paletes não são assinaladas por falta de peso líquido 
+R PASS | F2 filtro 'Pesos incompletos no Primavera' encontra-os 
+R PASS | F2 ficha do artigo mostra Peso bruto, Peso Líquido e Volume + aviso 
+R F2 casas decimais na ficha: {'volume': (16, 9), 'weight': (16, 5), 'primavera_peso_liquido': (16, 5)}
+R F3 PL/2026/0001 por artigo (artigo | caixas | bruto/cx | líquido/cx | bruto linha | líquido linha):
+R    AZ.002.01.00500.01 | 96 | 12.866 | 6.87 | 1235.136 | 659.52
+R    AZ.002.01.01000.02 | 120 | 11.762 | 10.992 | 1411.44 | 1319.04
+R    AZ.001.01.00500.01 | 192 | 12.866 | 6.87 | 2470.272 | 1319.04
+R    AZ.002.01.00250.01 | 180 | 6.062 | 2.748 | 1091.16 | 494.64
+R    AZ.001.01.00250.01 | 180 | 6.062 | 2.748 | 1091.16 | 494.64
+R    AZ.002.01.05000.02 | 104 | 14.248 | 13.74 | 1481.792 | 1428.96
+R    AZ.002.04.01000.02 | 70 | 12.79 | 10.992 | 895.3 | 769.44
+R    TP.001.10.00500.02 | 96 | 12.866 | 6.87 | 1235.136 | 659.52
+R    TP.001.10.00750.01 | 75 | 14.369 | 8.244 | 1077.675 | 618.3
+R    TP.001.10.05000.02 | 104 | 14.248 | 13.74 | 1481.792 | 1428.96
+R    TP.001.10.03000.01 | 144 | 11.544 | 10.992 | 1662.336 | 1582.848
+R    OLIV.001.01.00350.01 | 252 | 10.68 | 6.96 | 2691.36 | 1753.92
+R    OLIV.001.02.00350.01 | 252 | 10.68 | 6.96 | 2691.36 | 1753.92
+R    PAL.1200.0800.02 | 23 | 25.0 | 25.0 | 575.0 | 0.0 | palete
+R F3 TOTAIS: líquido 14282.748 | bruto 21090.919 | volume 32.0911 | caixas 1865
+R PASS | F3 PL/2026/0001: total líquido 14.282,748 kg (antes 16.733,628) | (16733.628, 14282.748)
+R PASS | F3 OLIV: 6,96 kg líquido/cx e 10,68 bruto/cx 
+R PASS | F3 contas por linha: líquido linha = caixas × líquido/cx; bruto idem 
+R PASS | F3 sem aviso (todos os artigos da FA/2026/171 têm os dois pesos) 
+R PASS | F4 FA/2026/171: linhas sem peso líquido no Primavera ficam com o da ficha (6,96 / 6,87) | [6.87, 6.96, 6.96]
+R PASS | F4 linhas com peso líquido no Primavera mantêm o da linha 
+R F4 totais FA/2026/171: líquido 14282.748 | bruto 21090.919
+R PASS | F4 total líquido da fatura = total líquido da PL | (14282.748, 14282.748)
+R F5 EMB.01.014.05000.01 | 1890.0 un | bruto/un 0.14203 | líquido/un 0.084 | bruto linha 268.437 | líquido linha 158.76
+R F5 EMB.01.021.10000.40 | 1750.0 un | bruto/un 0.0 | líquido/un 0.165 | bruto linha 0.0 | líquido linha 288.75
+R F5 EMB.01.002.01000.01 | 3360.0 un | bruto/un 0.0 | líquido/un 0.026 | bruto linha 0.0 | líquido linha 87.36
+R F5 CAPS.29.02.02.60 | 48000.0 un | bruto/un 0.00383 | líquido/un 0.00354 | bruto linha 183.84 | líquido linha 169.92
+R F5 CAPS.29.02.02.10 | 4000.0 un | bruto/un 0.00383 | líquido/un 0.00354 | bruto linha 15.32 | líquido linha 14.16
+R F5 CAPS.29.02.02.10 | 4000.0 un | bruto/un 0.00383 | líquido/un 0.00354 | bruto linha 15.32 | líquido linha 14.16
+R F5 CAPS.29.02.02.20 | 8000.0 un | bruto/un 0.00383 | líquido/un 0.00354 | bruto linha 30.64 | líquido linha 28.32
+R F5 CAPS.48.01.05.10 | 1800.0 un | bruto/un 0.0 | líquido/un 0.0 | bruto linha 0.0 | líquido linha 0.0
+R F5 totais FAT/2026/47: líquido 761.43 | bruto 513.557
+R F5 aviso na PL da FAT/2026/47: <p><b>Atenção — pesos em falta no Primavera</b> (não entram nos totais; corrigir no Primavera):</p><ul><li>CAPS.48.01.05.10: sem peso bruto nem peso líquido no Primavera</li><li>EMB.01.002.01000.01: sem peso bruto no Primavera</li><li>EMB.01.021.10000.40: sem peso bruto no Primavera</li></ul>
+R PASS | F5 aviso lista as embalagens sem peso bruto e o artigo sem nenhum peso 
+R PASS | F5 cápsulas: 0,00354 kg líquido/un e 0,00383 bruto/un 
+R F6 certificado.qualidade [('Novo', 14857.748)]
+R F6 certificado.salubridade [('CS/2026/0004', 5715.84), ('CS/2026/0003', 769.44)]
+R F6 boletins: [('BA/2026/0005', 5715.84, 8780.96), ('BA/2026/0001', 769.44, 895.3)]
+R F7 ECLs: 345 | linhas activas 726 | líquido igual à ficha 571 | sem líquido com ficha preenchida 0
+R PASS | F7 nenhuma linha activa fica sem peso líquido quando a ficha o tem 
+R PASS | F7 sem notificações nem mensagens nas ECLs | (0, 0)
+R TOTAL 18 / 18
+R FIM
+===== 5. reversão: -u com o código actual de produção
+-u proposta saída=0
+-u reversão saída=0
+OK /home/odoo/.claude/jobs/738b98e4/tmp/p6d_rev.txt
+[imd] 3 diferença(s)
+  + documentos.model_ir_sequence: ir.model / 12 / f
+  + primavera_connector.selection__primavera_sync_log__operation__employees: ir.model.fields.selection / 5587 / f
+  + primavera_connector.selection__primavera_sync_log__operation__validacao_prep_graso: ir.model.fields.selection / 5592 / f
+R reversão: ficha do artigo abre: True | sem campos novos: True
+R campos novos registados após reversão: 0
+R colunas na tabela (ficam, sem uso): ['primavera_code']
+R PL recarrega com código antigo: líquido 16733.244
+===== FIM
