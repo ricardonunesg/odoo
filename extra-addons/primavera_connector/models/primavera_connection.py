@@ -1809,6 +1809,9 @@ class PrimaveraConnection(models.Model):
             vat = vals.get("vat")
             if not partner and partner_type == "customer":
                 partner = self._find_existing_partner(vat, code_field)
+            elif not partner:
+                # Cliente que passa também a fornecedor: mesma ficha (dados do cliente mandam)
+                partner = self._find_existing_partner(vat, code_field, exigir_campo="primavera_customer_code")
 
             if partner:
                 if partner_type == "supplier" and partner.primavera_customer_code:
@@ -2271,7 +2274,7 @@ class PrimaveraConnection(models.Model):
                     )
                     if vals:
                         if not partner:
-                            self._safe_create_partner(Partner, vals)
+                            self._criar_ou_aproveitar_cliente(Partner, vals)
                             partner = Partner.search([("primavera_customer_code", "=", entidade)], limit=1)
                         elif not partner.ref:
                             # Parceiro existe mas sem ref (importado por versão anterior) — actualizar
@@ -2442,7 +2445,7 @@ class PrimaveraConnection(models.Model):
                             p_data, "customer", "primavera_customer_code", "customer_rank", category
                         )
                         if vals:
-                            self._safe_create_partner(Partner, vals)
+                            self._criar_ou_aproveitar_cliente(Partner, vals)
                             partner = Partner.search([("primavera_customer_code", "=", entidade)], limit=1)
 
                 date_val = self._parse_date(data.get("DataDoc") or data.get("Data"))
@@ -2885,29 +2888,46 @@ class PrimaveraConnection(models.Model):
     # UTILIDADES DE PARCEIROS
     # ─────────────────────────────────────────────────────────────────────
 
-    def _find_existing_partner(self, vat, code_field=None):
+    def _find_existing_partner(self, vat, code_field=None, exigir_campo=None):
         """Ficha a aproveitar pelo NIF quando o código ainda não tem ficha. Desde
-        27/10/2026: nunca com NIF fictício e nunca uma ficha que já tenha outro
-        código do mesmo tipo (code_field) — escrevia-se por cima de outro cliente."""
+        27/10/2026: nunca com NIF fictício, nunca uma ficha que já tenha outro
+        código do mesmo tipo (code_field) — escrevia-se por cima de outro cliente —,
+        só fichas de empresa/independentes (os contactos herdam o NIF da empresa) e
+        só se for única. exigir_campo: só fichas que já tenham esse código (ex.: um
+        fornecedor novo só se junta a uma ficha de cliente)."""
         if not vat or vat_ficticio(vat):
             return self.env["res.partner"]
         partners = (
             self.env["res.partner"]
             .sudo()
             .with_context(active_test=False)
-            .search([("vat", "=", vat)])
+            .search([("vat", "=", vat), ("parent_id", "=", False)])
         )
         partners = partners.filtered(self._can_reuse_partner)
         if code_field:
             partners = partners.filtered(lambda p: not p[code_field])
+        if exigir_campo:
+            partners = partners.filtered(lambda p: p[exigir_campo])
         return partners if len(partners) == 1 else self.env["res.partner"]
 
     def _can_reuse_partner(self, partner):
         if self.env["res.users"].sudo().search_count([("partner_id", "=", partner.id)]):
             return False
-        if self.env["crm.lead"].sudo().search_count([("partner_id", "=", partner.id)]):
+        # Contacto do CRM sem código com leads: quem o aproveita é o NIF Dedup, na
+        # criação. Uma ficha que já é do Primavera pode ter leads (27/10/2026).
+        if (not (partner.primavera_customer_code or partner.primavera_supplier_code)
+                and self.env["crm.lead"].sudo().search_count([("partner_id", "=", partner.id)])):
             return False
         return True
+
+    def _criar_ou_aproveitar_cliente(self, Partner, vals):
+        """Cliente novo vindo de uma ECL/fatura: aproveita a ficha com o mesmo NIF
+        (ex.: já é fornecedor) como a sincronização de clientes faz; senão cria."""
+        existente = self._find_existing_partner(vals.get("vat"), "primavera_customer_code")
+        if existente:
+            self._safe_write_partner(existente, vals)
+        else:
+            self._safe_create_partner(Partner, vals)
 
     def _safe_create_partner(self, Partner, vals):
         try:
