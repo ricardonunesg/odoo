@@ -88,11 +88,19 @@ class AccountMoveLine(models.Model):
         return {l.id: l.peso_liquido or l.product_id.primavera_peso_liquido for l in self}
 
     def _aviso_pesos(self):
-        """Artigos destas linhas com peso bruto ou líquido em falta no Primavera."""
-        return sorted({
-            f"{l.product_id.default_code}: {l.product_id.primavera_aviso_pesos}"
-            for l in self if l.product_id.primavera_aviso_pesos
-        })
+        """Artigos destas linhas sem peso bruto ou sem peso líquido (nem na linha nem na
+        ficha do artigo). O Odoo não inventa valores: ficam a 0 e avisa-se."""
+        avisos = set()
+        for l in self.filtered(lambda x: x.product_id.default_code):
+            code = l.product_id.default_code
+            falta = []
+            if not (l.peso_bruto or l.product_id.weight):
+                falta.append("peso bruto")
+            if not code.upper().startswith("PAL") and not (l.peso_liquido or l.product_id.primavera_peso_liquido):
+                falta.append("peso líquido")
+            if falta:
+                avisos.add(f"{code}: sem {' nem '.join(falta)} no Primavera")
+        return sorted(avisos)
 
     @api.model
     def _post_aviso_pesos(self, record, lines):
