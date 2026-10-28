@@ -147,8 +147,8 @@ class BoletimAnalises(models.Model):
     line_ids = fields.One2many("boletim.analises.linha", "documento_id", "Linhas")
     resultado_ids = fields.One2many("boletim.analises.resultado", "boletim_id", "Resultados de Análise")
 
-    total_peso_liquido = fields.Float("Total P. Líq. (kg)", compute="_compute_totals", store=True, digits=(16, 2))
-    total_peso_bruto   = fields.Float("Total P. Bruto (kg)", compute="_compute_totals", store=True, digits=(16, 2))
+    total_peso_liquido = fields.Float("Total P. Líq. (kg)", compute="_compute_totals", store=True, digits=(16, 3))
+    total_peso_bruto   = fields.Float("Total P. Bruto (kg)", compute="_compute_totals", store=True, digits=(16, 3))
     total_caixas       = fields.Integer("Nº Volumes",        compute="_compute_totals", store=True)
 
     # Visibilidade via template
@@ -427,10 +427,10 @@ class BoletimAnalisesLinha(models.Model):
     data_validade = fields.Date("Validade")
     quantidade    = fields.Float("Qnt", digits=(16, 2))
     unidade       = fields.Char("Uni")
-    peso_liquido  = fields.Float("P. Líq. Unit. (kg)", digits=(16, 2))
-    peso_bruto    = fields.Float("P. Bruto Unit. (kg)", digits=(16, 2))
-    pliquidot     = fields.Float("P. Líq. Total (kg)", compute="_compute_totais", store=True, digits=(16, 2))
-    pbrutot       = fields.Float("P. Bruto Total (kg)", compute="_compute_totais", store=True, digits=(16, 2))
+    peso_liquido  = fields.Float("P. Líq. Unit. (kg)", digits="Stock Weight")
+    peso_bruto    = fields.Float("P. Bruto Unit. (kg)", digits="Stock Weight")
+    pliquidot     = fields.Float("P. Líq. Total (kg)", compute="_compute_totais", store=True, digits=(16, 3))
+    pbrutot       = fields.Float("P. Bruto Total (kg)", compute="_compute_totais", store=True, digits=(16, 3))
     observacoes   = fields.Char("Obs.")
 
     @api.depends("quantidade", "peso_liquido", "peso_bruto")

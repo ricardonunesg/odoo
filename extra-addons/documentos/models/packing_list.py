@@ -232,9 +232,9 @@ class PackingListLine(models.Model):
     unidades_linha  = fields.Float("Unidades Totais", digits=(16, 2))
 
     # Valores unitários (provenientes da fatura, por caixa)
-    peso_liquido = fields.Float("P. Líq. Unit. (kg)", digits=(16, 3))
-    peso_bruto   = fields.Float("P. Bruto Unit. (kg)", digits=(16, 3))
-    volume       = fields.Float("Vol. Unit. (m³)", digits=(16, 4))
+    peso_liquido = fields.Float("P. Líq. Unit. (kg)", digits="Stock Weight")
+    peso_bruto   = fields.Float("P. Bruto Unit. (kg)", digits="Stock Weight")
+    volume       = fields.Float("Vol. Unit. (m³)", digits="Volume")
 
     # Fórmulas: totais por linha
     # pliquidoT = caixas × peso_liquido

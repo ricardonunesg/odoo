@@ -292,8 +292,8 @@ class SaleOrderLine(models.Model):
     # Campos preenchidos a partir do Primavera na sincronização da ECL
     lote           = fields.Char('Lote', copy=False)
     data_validade  = fields.Date('Validade', copy=False)
-    peso_liquido   = fields.Float('P. Líquido Unit. (kg)', digits=(16, 3), copy=False)
-    peso_bruto     = fields.Float('P. Bruto Unit. (kg)',   digits=(16, 3), copy=False)
-    volume         = fields.Float('Volume Unit. (m³)',     digits=(16, 4), copy=False)
+    peso_liquido   = fields.Float('P. Líquido Unit. (kg)', digits='Stock Weight', copy=False)
+    peso_bruto     = fields.Float('P. Bruto Unit. (kg)',   digits='Stock Weight', copy=False)
+    volume         = fields.Float('Volume Unit. (m³)',     digits='Volume', copy=False)
     caixas         = fields.Integer('Caixas', copy=False)
     unidades_linha = fields.Float('Unidades Totais', digits=(16, 2), copy=False)

@@ -77,8 +77,8 @@ class AccountMoveLine(models.Model):
 
     lote = fields.Char('Lote')
     data_validade = fields.Date('Validade')
-    peso_liquido = fields.Float('P. Líquido (kg)', digits=(16, 3))
-    peso_bruto = fields.Float('P. Bruto (kg)', digits=(16, 3))
-    volume = fields.Float('Volume (m³)', digits=(16, 4))
+    peso_liquido = fields.Float('P. Líquido (kg)', digits='Stock Weight')
+    peso_bruto = fields.Float('P. Bruto (kg)', digits='Stock Weight')
+    volume = fields.Float('Volume (m³)', digits='Volume')
     caixas = fields.Integer('Caixas')
     unidades_linha = fields.Float('Unidades Totais', digits=(16, 2))
