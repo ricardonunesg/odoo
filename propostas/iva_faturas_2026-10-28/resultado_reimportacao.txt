@@ -1,0 +1,36 @@
+restauro=0
+rede bloqueada: 6/6
+R ANTES (como está em produção): faturas com diferença de IVA/total > 0,05 € ou taxa diferente: 25 | só cêntimos (≤0,05 €): 68
+R     FAT/2026/185 IVA P 0.00 O 0.00 | total P 5508.00 O 5512.00 | taxas P [0.0] O [0] | anulada False
+R     FA/2026/170 IVA P 98.88 O 379.04 | total P 1746.88 O 2027.04 | taxas P [6.0] O [23.0] | anulada False
+R     FAT/2026/192 IVA P 1248.00 O 2208.00 | total P 10848.00 O 11808.00 | taxas P [13.0] O [23.0] | anulada False
+R     FA/2026/174 IVA P 401.76 O 1540.08 | total P 7097.76 O 8236.08 | taxas P [6.0] O [23.0] | anulada False
+R     FA/2026/175 IVA P 172.22 O 660.19 | total P 3042.62 O 3530.59 | taxas P [6.0] O [23.0] | anulada False
+R     FA/2026/176 IVA P 207.03 O 793.62 | total P 3657.53 O 4244.12 | taxas P [6.0] O [23.0] | anulada False
+R     FA/2026/172 IVA P 862.50 O 0.00 | total P 4612.50 O 3750.00 | taxas P [23.0] O [0] | anulada False
+R     FAT/2026/201 IVA P 1838.36 O 2946.76 | total P 14650.36 O 15758.76 | taxas P [13.0, 23.0] O [23.0] | anulada False
+R     FAT/2026/202 IVA P 1291.68 O 1328.48 | total P 11227.68 O 11264.48 | taxas P [13.0] O [0, 23.0] | anulada False
+R     FA/2026/180 IVA P 223.45 O 744.93 | total P 3462.28 O 3983.75 | taxas P [6.0, 13.0, 23.0] O [23.0] | anulada False
+R     FA/2026/181 IVA P 1.33 O 5.10 | total P 23.52 O 27.29 | taxas P [6.0] O [23.0] | anulada False
+R     FA/2026/183 IVA P 19.14 O 33.86 | total P 166.34 O 181.06 | taxas P [13.0] O [23.0] | anulada False
+R     FA/2026/185 IVA P 522.72 O 2003.76 | total P 9234.72 O 10715.76 | taxas P [6.0] O [23.0] | anulada False
+R     FA/2026/184 IVA P 401.76 O 1540.08 | total P 7097.76 O 8236.08 | taxas P [6.0] O [23.0] | anulada False
+R     FA/2026/186 IVA P 587.30 O 1306.58 | total P 6268.10 O 6987.38 | taxas P [6.0, 13.0] O [23.0] | anulada False
+R     FA/2026/187 IVA P 523.80 O 2007.90 | total P 9253.80 O 10737.90 | taxas P [6.0] O [23.0] | anulada False
+R     FAT/2026/194 IVA P 4352.40 O 7700.40 | total P 37832.40 O 41180.40 | taxas P [13.0] O [23.0] | anulada False
+R     FAT/2026/195 IVA P 2412.80 O 4268.80 | total P 20972.80 O 22828.80 | taxas P [13.0] O [23.0] | anulada False
+R     FA/2026/200 IVA P 680.62 O 2609.05 | total P 12024.32 O 13952.75 | taxas P [6.0] O [23.0] | anulada False
+R     FA/2026/197 IVA P 609.12 O 2334.96 | total P 10761.12 O 12486.96 | taxas P [6.0] O [23.0] | anulada False
+R     FA/2026/198 IVA P 301.58 O 1068.58 | total P 4947.58 O 5714.58 | taxas P [6.0, 13.0] O [23.0] | anulada False
+R     FA/2026/189 IVA P 215.04 O 824.32 | total P 3799.04 O 4408.32 | taxas P [6.0] O [23.0] | anulada False
+R     FAT/2026/206 IVA P 2114.74 O 3741.46 | total P 18381.94 O 20008.66 | taxas P [13.0] O [23.0] | anulada False
+R     FAT/2026/205 IVA P 312.00 O 552.00 | total P 2712.00 O 2952.00 | taxas P [13.0] O [23.0] | anulada False
+R     FA/2026/193 IVA P 1.33 O 5.10 | total P 23.52 O 27.29 | taxas P [6.0] O [23.0] | anulada False
+R reimportação FA: {'created': 0, 'updated': 446, 'skipped': 0, '_last': 446}
+R reimportação FAT: {'created': 0, 'updated': 449, 'skipped': 0, '_last': 449}
+R DEPOIS de reimportar com o código actual: faturas com diferença de IVA/total > 0,05 € ou taxa diferente: 1 | só cêntimos (≤0,05 €): 69
+R     FAT/2026/185 IVA P 0.00 O 0.00 | total P 5508.00 O 5512.00 | taxas P [0.0] O [0] | anulada False
+R FA/2026/176 depois: 3450.5 207.03 3657.53 [('AZ.105.01.02000.01', ['6%']), ('PAL.1200.0800.02', ['23%'])]
+R FA/2026/172 depois: 3750.0 862.5 4612.5 [('CESSAO DE EXPLORAÇAO DO ARMAZE', ['23%']), ('SITO NA ESTRADA  PISA PIMENTA ', []), ('1750- 221 LISBOA (MAIO)', [])]
+R FIM (transacção desfeita)
+===== FIM

@@ -57,3 +57,10 @@ FA/2026/176 — IVA 23% no Odoo vs 6% no Primavera desde a importação (Maio); 
 ## Do peso líquido (28/10/2026)
 - PL/2026/0001 (id 36) e "Novo" (id 35) NÃO recarregadas — decisão do Gonçalo à parte (recarregar → líquido 16.733,628 → 14.282,748 kg).
 - Primavera: preencher Peso (bruto) nos 132 artigos assinalados ("Pesos incompletos no Primavera") e PesoLiquido em DIV.0002, DIV.0003, MERC.0005, MERC.0006.
+
+## IVA das faturas (28/10/2026) — analisado, correcção por autorizar
+- 24 faturas com IVA errado (importadas 30/04–20/05/2026 por versão antiga do conector): FA/2026/170, 172, 174, 175, 176, 180, 181, 183, 184, 185, 186, 187, 189, 193, 197, 198, 200; FAT/2026/192, 194, 195, 201, 202, 205, 206. O código actual importa-as bem (ensaio: reimportação das 895 → só a FAT/2026/185 fica diferente).
+- Proposta ffd5e0d: verificação diária compara IVA/total; rascunho diferente → reimportado, lançado → só aviso.
+- FAT/2026/185 (lançada no Odoo): 5.512 € vs 5.508 € no Primavera (base) — não alterar.
+- 13 faturas anuladas no Primavera continuam activas no Odoo: FA/2026/21, 100, 191, 201, 203, 222, 278, 405, 406; FAT/2026/274, 281, 285, 302 — fora do âmbito do IVA, por decidir.
+- 69 faturas com diferença de 1–3 cêntimos (arredondamento, aceite).
