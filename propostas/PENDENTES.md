@@ -65,3 +65,7 @@ FA/2026/176 — IVA 23% no Odoo vs 6% no Primavera desde a importação (Maio); 
 - 13 faturas anuladas no Primavera continuam activas no Odoo: FA/2026/21, 100, 191, 201, 203, 222, 278, 405, 406; FAT/2026/274, 281, 285, 302 — fora do âmbito do IVA, por decidir.
 - 69 faturas com diferença de 1–3 cêntimos (arredondamento, aceite).
 - Na reimportação não se mexeu nas ligações fatura↔ECL. O Primavera tem 2 ligações que o Odoo não tem: FA/2026/185 também na ECL/2026/212 e FA/2026/200 na ECL id 254 — por decidir.
+
+## ECL/2026/427 (28/10/2026) — analisada, correcção por autorizar
+- Causa: cliente trocado no Primavera (CL0001 → CL0647) entre 12:26 e 12:57 UTC de 07/09, depois de a ECL já estar no Odoo; o conector nunca actualiza o cliente de uma ECL existente. Única em 535 ECLs 2025/2026. Anulada, sem faturas/PL/certificados/declarações.
+- Proposta 544120e+97c877b: na re-sync, cliente diferente numa ECL sem faturas → actualiza cliente/faturação/entrega (resto igual), sem notificações, com registo no histórico. Ensaio 9/9.
