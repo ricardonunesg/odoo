@@ -150,6 +150,8 @@ class CertificadoSalubridade(models.Model):
         if not inv_lines:
             return {"type": "ir.actions.client", "tag": "reload"}
 
+        liquido = inv_lines._peso_liquido_unit()
+
         # ── Agrupar por prefixo de lote — só prefixos reconhecidos ──────────
         grupos = {}
         for l in inv_lines:
@@ -181,7 +183,7 @@ class CertificadoSalubridade(models.Model):
 
             total_cx = sum(l.caixas or int(l.quantity) for l in linhas)
             total_pl = sum(
-                (l.caixas or int(l.quantity)) * (l.peso_liquido or l.product_id.weight or 0)
+                (l.caixas or int(l.quantity)) * liquido[l.id]
                 for l in linhas
             )
 

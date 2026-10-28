@@ -258,6 +258,8 @@ class BoletimAnalises(models.Model):
         if not inv_lines:
             return {"type": "ir.actions.client", "tag": "reload"}
 
+        liquido = inv_lines._peso_liquido_unit()
+
         # Agrupar por prefixo de lote — só prefixos reconhecidos
         grupos = {}
         for l in inv_lines:
@@ -290,7 +292,7 @@ class BoletimAnalises(models.Model):
                     'data_validade': l.data_validade,
                     'quantidade':    l.caixas or int(l.quantity),
                     'unidade':       product.uom_id.name or '',
-                    'peso_liquido':  l.peso_liquido or product.weight,
+                    'peso_liquido':  liquido[l.id],
                     'peso_bruto':    l.peso_bruto or product.weight,
                 })
             return vals
@@ -312,7 +314,7 @@ class BoletimAnalises(models.Model):
                 if lt and lt not in lotes:
                     lotes.append(lt)
                 total_cx += l.caixas or int(l.quantity)
-                total_pl += (l.caixas or int(l.quantity)) * (l.peso_liquido or l.product_id.weight or 0)
+                total_pl += (l.caixas or int(l.quantity)) * liquido[l.id]
                 total_pb += (l.caixas or int(l.quantity)) * (l.peso_bruto or l.product_id.weight or 0)
                 if first_val is None:
                     first_val = l.data_validade or l.product_id.x_data_validade

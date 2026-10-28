@@ -80,5 +80,21 @@ class AccountMoveLine(models.Model):
     peso_liquido = fields.Float('P. Líquido (kg)', digits='Stock Weight')
     peso_bruto = fields.Float('P. Bruto (kg)', digits='Stock Weight')
     volume = fields.Float('Volume (m³)', digits='Volume')
+
+    def _peso_liquido_unit(self):
+        """{id da linha: peso líquido unitário (kg)} — o da linha; sem ele, o PesoLiquido
+        do artigo no Primavera, nunca o peso bruto (28/10/2026). Primavera indisponível:
+        o peso do artigo, como antes."""
+        sem = self.filtered(lambda l: not l.peso_liquido and l.product_id.default_code)
+        liquidos = {}
+        if sem:
+            conn = self.env["primavera.connection"].sudo().search([], limit=1)
+            liquidos = conn._primavera_pesos_liquidos(sem.mapped("product_id.default_code")) if conn else None
+        return {
+            l.id: l.peso_liquido or (
+                liquidos.get(l.product_id.default_code, 0.0) if liquidos is not None else l.product_id.weight
+            )
+            for l in self
+        }
     caixas = fields.Integer('Caixas')
     unidades_linha = fields.Float('Unidades Totais', digits=(16, 2))

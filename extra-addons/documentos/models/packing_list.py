@@ -154,13 +154,13 @@ class PackingList(models.Model):
             return
         self.line_ids.unlink()
         vals_list = []
-        for i, linha in enumerate(
-            self.fatura_id.invoice_line_ids.filtered(
-                lambda l: l.display_type == 'product'
-                and l.product_id
-                and l.product_id.default_code
-            )
-        ):
+        linhas = self.fatura_id.invoice_line_ids.filtered(
+            lambda l: l.display_type == 'product'
+            and l.product_id
+            and l.product_id.default_code
+        )
+        liquido = linhas._peso_liquido_unit()
+        for i, linha in enumerate(linhas):
             product = linha.product_id
             caixas = linha.caixas or int(linha.quantity)
             vals_list.append({
@@ -170,7 +170,7 @@ class PackingList(models.Model):
                 "description":      linha.name or '',
                 "lote":             linha.lote if linha.lote and not (linha.lote.startswith('<') and linha.lote.endswith('>')) else '',
                 "data_validade":    linha.data_validade,
-                "peso_liquido":     linha.peso_liquido or product.weight,
+                "peso_liquido":     liquido[linha.id],
                 "peso_bruto":       linha.peso_bruto or product.weight,
                 "volume":           linha.volume or product.volume,
                 "uni":              product.uom_id.name or '',
