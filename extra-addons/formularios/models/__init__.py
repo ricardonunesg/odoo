@@ -1,1 +1,1 @@
-from . import form_cliente, form_fornecedor
+from . import form_cliente, form_fornecedor, form_cliente_linha, form_fornecedor_linha

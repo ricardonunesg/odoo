@@ -21,9 +21,23 @@
               <p><strong>Utilizador:</strong> <span t-esc="o.user_id.name"/></p>
               <p><strong>Armazém:</strong> <span t-esc="dict(o._fields['armazem'].selection).get(o.armazem)"/></p>
               <p><strong>Fornecedor:</strong> <span t-esc="o.fornecedor"/></p>
-              <p><strong>Código Artigo:</strong> <span t-esc="o.codigo_artigo"/></p>
-              <p><strong>Descrição Artigo:</strong> <span t-esc="o.descricao_artigo"/></p>
-              <p><strong>Lote / Guia remessa / Fatura:</strong> <span t-esc="o.lote_guia_fatura"/></p>
+              <p><strong>Artigos:</strong></p>
+              <table class="table table-sm table-bordered" style="font-size:11px;">
+                <thead style="background:#e8e8e8;">
+                  <tr>
+                    <th>Código</th>
+                    <th>Descrição</th>
+                    <th>Lote / Guia / Fatura</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr t-foreach="o.linha_ids" t-as="l">
+                    <td><span t-esc="l.codigo_artigo"/></td>
+                    <td><span t-esc="l.descricao_artigo"/></td>
+                    <td><span t-esc="l.lote_guia_fatura"/></td>
+                  </tr>
+                </tbody>
+              </table>
               <p><strong>Descrição da Reclamação:</strong></p>
               <div t-esc="o.descricao_reclamacao"/>
               <p><strong>Ações de Correção:</strong></p>

@@ -1,6 +1,6 @@
 <odoo>
   <data>
-    <menuitem id="menu_qualidade_root" name="Qualidade" sequence="20" groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_root" name="Qualidade" sequence="20" web_icon="qualidade_reclamacoes,static/description/icon.png" groups="qualidade_reclamacoes.group_qualidade_eng"/>
     <menuitem id="menu_qualidade_dashboard" name="Dashboard"
               parent="menu_qualidade_root" sequence="5"
               groups="qualidade_reclamacoes.group_qualidade_eng"/>

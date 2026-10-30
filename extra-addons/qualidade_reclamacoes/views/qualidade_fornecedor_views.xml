@@ -21,11 +21,18 @@
               <field name="utilizador_id" readonly="1"/>
               <field name="armazem" readonly="1"/>
               <field name="fornecedor" readonly="1"/>
-              <field name="codigo_artigo" readonly="1"/>
-              <field name="descricao_artigo" readonly="1"/>
-              <field name="lote_guia_fatura" readonly="1"/>
               <field name="descricao_reclamacao" readonly="1"/>
               <field name="anexos_formulario_ids" widget="many2many_binary" readonly="1"/>
+            </group>
+
+            <group string="Artigos da Reclamação">
+              <field name="linha_ids" nolabel="1" readonly="1">
+                <list>
+                  <field name="codigo_artigo"/>
+                  <field name="descricao_artigo"/>
+                  <field name="lote_guia_fatura"/>
+                </list>
+              </field>
             </group>
 
             <group string="Resposta da Qualidade">

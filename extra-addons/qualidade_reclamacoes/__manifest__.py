@@ -1,4 +1,5 @@
 {
+    'web_icon': 'qualidade_reclamacoes/static/description/icon.png',
     'name': 'Qualidade - Reclamações',
     'version': '1.0.0',
     'summary': 'Gestão de reclamações por Qualidade (respostas e estado)',

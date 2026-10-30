@@ -1,3 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_form_reclama_cliente,access_form_reclama_cliente,model_form_reclama_cliente,,1,1,1,1
 access_form_reclama_fornecedor,access_form_reclama_fornecedor,model_form_reclama_fornecedor,,1,1,1,1
+access_form_reclama_cliente_linha,access_form_reclama_cliente_linha,model_form_reclama_cliente_linha,,1,1,1,1
+access_form_reclama_fornecedor_linha,access_form_reclama_fornecedor_linha,model_form_reclama_fornecedor_linha,,1,1,1,1
