@@ -10,7 +10,7 @@
     <menuitem id="menu_qualidade_dashboard_geral" name="Visão Geral"
               parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard" sequence="5"
               groups="qualidade_reclamacoes.group_qualidade_eng"/>
-    <menuitem id="menu_qualidade_dashboard_tipo" name="Cliente vs Fornecedor"
+    <menuitem id="menu_qualidade_dashboard_tipo" name="Por Tipo"
               parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard_tipo" sequence="10"
               groups="qualidade_reclamacoes.group_qualidade_eng"/>
     <menuitem id="menu_qualidade_dashboard_clientes" name="Clientes"
@@ -18,6 +18,9 @@
               groups="qualidade_reclamacoes.group_qualidade_eng"/>
     <menuitem id="menu_qualidade_dashboard_fornecedores" name="Fornecedores"
               parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard_fornecedores" sequence="30"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_dashboard_internas" name="Internas"
+              parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard_internas" sequence="35"
               groups="qualidade_reclamacoes.group_qualidade_eng"/>
     <menuitem id="menu_qualidade_dashboard_categoria" name="Categoria"
               parent="menu_qualidade_dashboard" action="qualidade_reclamacoes.action_qualidade_dashboard_categoria" sequence="40"
@@ -51,6 +54,9 @@
               groups="qualidade_reclamacoes.group_qualidade_eng"/>
     <menuitem id="menu_qualidade_fornecedores" name="Reclamações Fornecedores"
               parent="menu_qualidade_root" action="qualidade_reclamacoes.action_qualidade_fornecedor" sequence="20"
+              groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_internas" name="Reclamações Internas"
+              parent="menu_qualidade_root" action="qualidade_reclamacoes.action_qualidade_interna" sequence="30"
               groups="qualidade_reclamacoes.group_qualidade_eng"/>
   </data>
 </odoo>

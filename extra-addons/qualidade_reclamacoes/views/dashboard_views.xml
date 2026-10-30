@@ -99,11 +99,26 @@
       <field name="name">qualidade.reclamacao.dashboard.tipo.graph</field>
       <field name="model">qualidade.reclamacao.dashboard</field>
       <field name="arch" type="xml">
-        <graph string="Cliente vs Fornecedor" type="bar" stacked="True">
+        <graph string="Por Tipo" type="bar" stacked="True">
           <field name="tipo"/>
           <field name="estado_resposta"/>
           <field name="quantidade" type="measure"/>
         </graph>
+      </field>
+    </record>
+
+    <record id="view_qualidade_dashboard_tipo_pivot" model="ir.ui.view">
+      <field name="name">qualidade.reclamacao.dashboard.tipo.pivot</field>
+      <field name="model">qualidade.reclamacao.dashboard</field>
+      <field name="arch" type="xml">
+        <pivot string="Por Tipo" disable_linking="True">
+          <field name="tipo" type="row"/>
+          <field name="quantidade" type="measure"/>
+          <field name="taxa_fecho" type="measure"/>
+          <field name="qtd_fora_sla_7" type="measure"/>
+          <field name="qtd_fora_sla_15" type="measure"/>
+          <field name="qtd_fora_sla_30" type="measure"/>
+        </pivot>
       </field>
     </record>
 
@@ -275,10 +290,14 @@
     </record>
 
     <record id="action_qualidade_dashboard_tipo" model="ir.actions.act_window">
-      <field name="name">Cliente vs Fornecedor</field>
+      <field name="name">Por Tipo</field>
       <field name="res_model">qualidade.reclamacao.dashboard</field>
       <field name="view_mode">graph,pivot,list</field>
       <field name="view_id" ref="view_qualidade_dashboard_tipo_graph"/>
+      <field name="view_ids" eval="[(5, 0, 0),
+          (0, 0, {'view_mode': 'graph', 'view_id': ref('view_qualidade_dashboard_tipo_graph')}),
+          (0, 0, {'view_mode': 'pivot', 'view_id': ref('view_qualidade_dashboard_tipo_pivot')}),
+          (0, 0, {'view_mode': 'list', 'view_id': ref('view_qualidade_dashboard_list')})]"/>
       <field name="search_view_id" ref="view_qualidade_dashboard_search"/>
       <field name="context">{'search_default_group_tipo': 1}</field>
     </record>
@@ -299,6 +318,16 @@
       <field name="view_mode">graph,pivot,list</field>
       <field name="view_id" ref="view_qualidade_dashboard_categoria_gravidade_graph"/>
       <field name="domain">[('tipo', '=', 'fornecedor'), ('categoria', '!=', False), ('gravidade', '!=', False)]</field>
+      <field name="search_view_id" ref="view_qualidade_dashboard_search"/>
+      <field name="context">{'search_default_group_categoria': 1}</field>
+    </record>
+
+    <record id="action_qualidade_dashboard_internas" model="ir.actions.act_window">
+      <field name="name">Estatísticas Internas</field>
+      <field name="res_model">qualidade.reclamacao.dashboard</field>
+      <field name="view_mode">graph,pivot,list</field>
+      <field name="view_id" ref="view_qualidade_dashboard_categoria_gravidade_graph"/>
+      <field name="domain">[('tipo', '=', 'interna'), ('categoria', '!=', False), ('gravidade', '!=', False)]</field>
       <field name="search_view_id" ref="view_qualidade_dashboard_search"/>
       <field name="context">{'search_default_group_categoria': 1}</field>
     </record>

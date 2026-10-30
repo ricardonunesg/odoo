@@ -23,6 +23,8 @@ class QualidadeRespostaFornecedor(models.Model):
     utilizador_id = fields.Many2one('res.users', related='reclamacao_id.user_id', string='Utilizador', readonly=True)
     armazem = fields.Selection(related='reclamacao_id.armazem', string='Armazém', readonly=True)
     fornecedor = fields.Char(related='reclamacao_id.fornecedor', string='Fornecedor', readonly=True)
+    tipo_reclamacao = fields.Selection(related='reclamacao_id.tipo_reclamacao', string='Tipo', readonly=True)
+    instalacao_reclamada = fields.Selection(related='reclamacao_id.instalacao_reclamada', string='Instalação Reclamada', readonly=True)
     codigo_artigo = fields.Char(related='reclamacao_id.codigo_artigo', string='Código Artigo (legado)', readonly=True)
     descricao_artigo = fields.Char(related='reclamacao_id.descricao_artigo', string='Descrição Artigo (legado)', readonly=True)
     lote_guia_fatura = fields.Char(related='reclamacao_id.lote_guia_fatura', string='Lote / Guia / Fatura (legado)', readonly=True)

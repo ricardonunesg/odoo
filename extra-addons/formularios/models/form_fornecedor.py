@@ -12,6 +12,12 @@ EMAILS_FIXOS = [
     'ricardo.nunes@mirazeite.com',
 ]
 
+# Instalações a que se pode fazer uma reclamação interna (ex.: Arruda reclama a Tomar)
+INSTALACOES = [
+    ('a1', 'A1 - Arruda'),
+    ('a2', 'A2 - Tomar'),
+]
+
 class FormReclamacaoFornecedor(models.Model):
     _name = 'form.reclama.fornecedor'
     _description = 'Formulário - Reclamações de Fornecedor'
@@ -23,6 +29,14 @@ class FormReclamacaoFornecedor(models.Model):
         ('a2', 'A2 - Tomar'),
         ('outra', 'Outra'),
     ], string='Armazém', required=True)
+
+    tipo_reclamacao = fields.Selection([
+        ('externa', 'Externa'),
+        ('interna', 'Interna'),
+    ], string='Tipo', required=True, default='externa',
+       help='Externa: reclamação a um fornecedor do Primavera. '
+            'Interna: reclamação a outra instalação da Mirazeite.')
+    instalacao_reclamada = fields.Selection(INSTALACOES, string='Instalação Reclamada')
 
     fornecedor_partner_id = fields.Many2one(
         'res.partner',
@@ -69,6 +83,21 @@ class FormReclamacaoFornecedor(models.Model):
             if not rec.linha_ids:
                 raise ValidationError("É obrigatório adicionar pelo menos 1 artigo à reclamação.")
 
+    @api.constrains('tipo_reclamacao', 'instalacao_reclamada', 'armazem')
+    def _check_instalacao_reclamada(self):
+        for rec in self:
+            if rec.tipo_reclamacao != 'interna':
+                continue
+            if not rec.instalacao_reclamada:
+                raise ValidationError("Numa reclamação interna é obrigatório indicar a 'Instalação Reclamada'.")
+            if rec.instalacao_reclamada == rec.armazem:
+                raise ValidationError("A 'Instalação Reclamada' não pode ser a mesma do 'Armazém' de origem.")
+
+    @api.model
+    def _nome_instalacao(self, instalacao):
+        """Nome guardado em 'fornecedor' numa reclamação interna (listas, email, painéis)."""
+        return 'Interna - %s' % (dict(INSTALACOES).get(instalacao) or '?')
+
     def _vincular_anexos_ao_registo(self):
         for rec in self:
             rec.anexos_ids.sudo().write({
@@ -87,6 +116,16 @@ class FormReclamacaoFornecedor(models.Model):
         for rec in self:
             rec.fornecedor = rec.fornecedor_partner_id.display_name or False
 
+    @api.onchange('tipo_reclamacao', 'instalacao_reclamada')
+    def _onchange_tipo_reclamacao(self):
+        for rec in self:
+            if rec.tipo_reclamacao == 'interna':
+                rec.fornecedor_partner_id = False
+                rec.fornecedor = rec._nome_instalacao(rec.instalacao_reclamada) if rec.instalacao_reclamada else False
+            else:
+                rec.instalacao_reclamada = False
+                rec.fornecedor = rec.fornecedor_partner_id.display_name or False
+
     @api.onchange('artigo_id')
     def _onchange_artigo_id(self):
         for rec in self:
@@ -100,6 +139,11 @@ class FormReclamacaoFornecedor(models.Model):
             for partner in self.env['res.partner'].browse(partner_ids).exists()
         }
         for vals in vals_list:
+            if vals.get('tipo_reclamacao') == 'interna':
+                # Interna: sem fornecedor ERP; o nome vem da instalação reclamada
+                vals['fornecedor_partner_id'] = False
+                vals['fornecedor'] = self._nome_instalacao(vals.get('instalacao_reclamada'))
+                continue
             partner_id = vals.get('fornecedor_partner_id')
             if partner_id and not vals.get('fornecedor'):
                 vals['fornecedor'] = partners_by_id.get(partner_id)
@@ -149,11 +193,19 @@ class FormReclamacaoFornecedor(models.Model):
                     f'<td>{l.lote_guia_fatura or ""}</td></tr>'
                 )
             linhas_html += '</table>'
+        if self.tipo_reclamacao == 'interna':
+            intro = 'Foi criado um novo formulário de reclamação interna.'
+            entidade = f"<strong>Instalação Reclamada:</strong> {dict(INSTALACOES).get(self.instalacao_reclamada, '')}"
+            assunto = f'Nova Reclamação Interna - {dict(INSTALACOES).get(self.instalacao_reclamada, "")}'
+        else:
+            intro = 'Foi criado um novo formulário de reclamação de fornecedor.'
+            entidade = f"<strong>Fornecedor:</strong> {self.fornecedor or ''}"
+            assunto = f'Nova Reclamação de Fornecedor - {self.fornecedor or ""}'
         body = f'''
-            <p>Foi criado um novo formulário de reclamação de fornecedor.</p>
+            <p>{intro}</p>
             <p><strong>Utilizador:</strong> {self.user_id.name or ''}</p>
             <p><strong>Armazém:</strong> {dict(self._fields['armazem'].selection).get(self.armazem, '')}</p>
-            <p><strong>Fornecedor:</strong> {self.fornecedor or ''}</p>
+            <p>{entidade}</p>
             <p><strong>Artigos:</strong></p>
             {linhas_html}
             <p><strong>Descrição da Reclamação:</strong><br/>{self.descricao_reclamacao or ''}</p>
@@ -166,7 +218,7 @@ class FormReclamacaoFornecedor(models.Model):
             attach_ids.append((4, a.id))
 
         mail = self.env['mail.mail'].sudo().create({
-            'subject': f'Nova Reclamação de Fornecedor - {self.fornecedor or ""}',
+            'subject': assunto,
             'email_from': 'noreply@mirazeite.com',
             'email_to': self._get_destinatarios_email(),
             'body_html': body,
@@ -210,6 +262,14 @@ class FormReclamacaoFornecedor(models.Model):
         res = super().write(vals)
         if 'anexos_ids' in vals:
             self._vincular_anexos_ao_registo()
+        if {'tipo_reclamacao', 'instalacao_reclamada'} & set(vals):
+            for rec in self.filtered(lambda r: r.tipo_reclamacao == 'interna'):
+                nome = rec._nome_instalacao(rec.instalacao_reclamada)
+                if rec.fornecedor != nome or rec.fornecedor_partner_id:
+                    super(FormReclamacaoFornecedor, rec).write({
+                        'fornecedor': nome,
+                        'fornecedor_partner_id': False,
+                    })
         return res
 
 

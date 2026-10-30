@@ -10,6 +10,7 @@ class QualidadeReclamacaoDashboard(models.Model):
     tipo = fields.Selection([
         ('cliente', 'Cliente'),
         ('fornecedor', 'Fornecedor'),
+        ('interna', 'Interna'),
     ], string='Tipo', readonly=True)
     reclamacao_ref = fields.Char(string='Reclamação', readonly=True)
     entidade = fields.Char(string='Cliente / Fornecedor', readonly=True)
@@ -55,6 +56,11 @@ class QualidadeReclamacaoDashboard(models.Model):
     fora_sla_30 = fields.Boolean(string='Fora SLA 30 Dias', readonly=True)
     acoes_corretivas_pendentes = fields.Boolean(string='Ações Corretivas Pendentes', readonly=True)
     quantidade = fields.Integer(string='Quantidade', readonly=True)
+    # Medidas para comparar os tipos lado a lado (tabela dinâmica "Por Tipo")
+    taxa_fecho = fields.Float(string='% Fechadas', readonly=True, aggregator='avg')
+    qtd_fora_sla_7 = fields.Integer(string='Qtd. Fora SLA 7 Dias', readonly=True)
+    qtd_fora_sla_15 = fields.Integer(string='Qtd. Fora SLA 15 Dias', readonly=True)
+    qtd_fora_sla_30 = fields.Integer(string='Qtd. Fora SLA 30 Dias', readonly=True)
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
@@ -104,6 +110,10 @@ class QualidadeReclamacaoDashboard(models.Model):
                         COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado'
                         AND resposta.data_conclusao IS NULL
                     ) AS acoes_corretivas_pendentes,
+                    CASE WHEN COALESCE(resposta.estado_resposta, 'sem_resposta') = 'fechado' THEN 100 ELSE 0 END::float AS taxa_fecho,
+                    (COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado' AND CURRENT_DATE - cliente.create_date::date > 7)::int AS qtd_fora_sla_7,
+                    (COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado' AND CURRENT_DATE - cliente.create_date::date > 15)::int AS qtd_fora_sla_15,
+                    (COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado' AND CURRENT_DATE - cliente.create_date::date > 30)::int AS qtd_fora_sla_30,
                     'Cliente #' || cliente.id::varchar AS reclamacao_ref,
                     1 AS quantidade
                 FROM form_reclama_cliente cliente
@@ -119,7 +129,7 @@ class QualidadeReclamacaoDashboard(models.Model):
 
                 SELECT
                     (fornecedor.id * 2) AS id,
-                    'fornecedor'::varchar AS tipo,
+                    (CASE WHEN fornecedor.tipo_reclamacao = 'interna' THEN 'interna' ELSE 'fornecedor' END)::varchar AS tipo,
                     fornecedor.fornecedor AS entidade,
                     fornecedor.user_id AS utilizador_id,
                     fornecedor.armazem AS armazem,
@@ -161,7 +171,11 @@ class QualidadeReclamacaoDashboard(models.Model):
                         COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado'
                         AND resposta.data_conclusao IS NULL
                     ) AS acoes_corretivas_pendentes,
-                    'Fornecedor #' || fornecedor.id::varchar AS reclamacao_ref,
+                    CASE WHEN COALESCE(resposta.estado_resposta, 'sem_resposta') = 'fechado' THEN 100 ELSE 0 END::float AS taxa_fecho,
+                    (COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado' AND CURRENT_DATE - fornecedor.create_date::date > 7)::int AS qtd_fora_sla_7,
+                    (COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado' AND CURRENT_DATE - fornecedor.create_date::date > 15)::int AS qtd_fora_sla_15,
+                    (COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado' AND CURRENT_DATE - fornecedor.create_date::date > 30)::int AS qtd_fora_sla_30,
+                    (CASE WHEN fornecedor.tipo_reclamacao = 'interna' THEN 'Interna #' ELSE 'Fornecedor #' END) || fornecedor.id::varchar AS reclamacao_ref,
                     1 AS quantidade
                 FROM form_reclama_fornecedor fornecedor
                 LEFT JOIN LATERAL (

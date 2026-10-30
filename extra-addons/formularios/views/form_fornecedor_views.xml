@@ -12,10 +12,17 @@
             <group>
               <field name="user_id"/>
               <field name="armazem"/>
+              <field name="tipo_reclamacao" widget="radio" options="{'horizontal': true}"/>
             </group>
 
             <group>
-              <field name="fornecedor_partner_id" required="1" options="{'no_create': True, 'no_create_edit': True}"/>
+              <field name="fornecedor_partner_id"
+                     invisible="tipo_reclamacao == 'interna'"
+                     required="tipo_reclamacao != 'interna'"
+                     options="{'no_create': True, 'no_create_edit': True}"/>
+              <field name="instalacao_reclamada"
+                     invisible="tipo_reclamacao != 'interna'"
+                     required="tipo_reclamacao == 'interna'"/>
               <field name="fornecedor" invisible="1"/>
             </group>
 

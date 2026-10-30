@@ -17,10 +17,13 @@
         <t t-foreach="docs" t-as="o">
           <t t-call="web.external_layout">
             <div class="page">
-              <h2>Formulário de Reclamação - Fornecedor</h2>
+              <t t-set="interna" t-value="o.tipo_reclamacao == 'interna'"/>
+              <h2 t-if="interna">Formulário de Reclamação - Interna</h2>
+              <h2 t-else="">Formulário de Reclamação - Fornecedor</h2>
               <p><strong>Utilizador:</strong> <span t-esc="o.user_id.name"/></p>
               <p><strong>Armazém:</strong> <span t-esc="dict(o._fields['armazem'].selection).get(o.armazem)"/></p>
-              <p><strong>Fornecedor:</strong> <span t-esc="o.fornecedor"/></p>
+              <p t-if="interna"><strong>Instalação Reclamada:</strong> <span t-esc="dict(o._fields['instalacao_reclamada'].selection).get(o.instalacao_reclamada)"/></p>
+              <p t-else=""><strong>Fornecedor:</strong> <span t-esc="o.fornecedor"/></p>
               <p><strong>Artigos:</strong></p>
               <table class="table table-sm table-bordered" style="font-size:11px;">
                 <thead style="background:#e8e8e8;">

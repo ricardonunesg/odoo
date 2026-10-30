@@ -8,7 +8,8 @@
         <form>
           <sheet>
             <div class="oe_title">
-              <h1>Resposta Qualidade - Fornecedor</h1>
+              <h1 invisible="tipo_reclamacao == 'interna'">Resposta Qualidade - Fornecedor</h1>
+              <h1 invisible="tipo_reclamacao != 'interna'">Resposta Qualidade - Interna</h1>
             </div>
 
             <group>
@@ -20,7 +21,9 @@
             <group string="Dados do Formulário">
               <field name="utilizador_id" readonly="1"/>
               <field name="armazem" readonly="1"/>
-              <field name="fornecedor" readonly="1"/>
+              <field name="tipo_reclamacao" readonly="1"/>
+              <field name="fornecedor" readonly="1" invisible="tipo_reclamacao == 'interna'"/>
+              <field name="instalacao_reclamada" readonly="1" invisible="tipo_reclamacao != 'interna'"/>
               <field name="descricao_reclamacao" readonly="1"/>
               <field name="anexos_formulario_ids" widget="many2many_binary" readonly="1"/>
             </group>
@@ -103,6 +106,16 @@
       <field name="res_model">form.reclama.fornecedor</field>
       <field name="view_mode">list</field>
       <field name="view_id" ref="view_qualidade_fornecedor_list"/>
+      <field name="domain">[('tipo_reclamacao', '!=', 'interna')]</field>
+    </record>
+
+    <!-- Reclamações internas (ex.: Arruda reclama a Tomar): mesmo modelo, mesma lista e mesma resposta -->
+    <record id="action_qualidade_interna" model="ir.actions.act_window">
+      <field name="name">Reclamações Internas</field>
+      <field name="res_model">form.reclama.fornecedor</field>
+      <field name="view_mode">list</field>
+      <field name="view_id" ref="view_qualidade_fornecedor_list"/>
+      <field name="domain">[('tipo_reclamacao', '=', 'interna')]</field>
     </record>
 
   </data>
