@@ -1,5 +1,87 @@
 from odoo import fields, models, tools
 
+from .constantes import ARMAZENS, ESTADOS_RESPOSTA, CATEGORIAS, ORIGENS, GRAVIDADES
+
+# Um bloco SELECT por origem (clientes / fornecedores). O SQL é igual nos dois:
+# só mudam a tabela, o alias, o id, o tipo, a entidade e a referência.
+_SQL_BLOCO = """
+                SELECT
+                    {id_expr} AS id,
+                    {tipo_expr}::varchar AS tipo,
+                    {a}.{entidade} AS entidade,
+                    {a}.user_id AS utilizador_id,
+                    {a}.armazem AS armazem,
+                    {a}.codigo_artigo AS codigo_artigo,
+                    {a}.descricao_artigo AS descricao_artigo,
+                    {a}.create_date AS data_criacao,
+                    COALESCE(resposta.estado_resposta, 'sem_resposta') AS estado_resposta,
+                    resposta.categoria AS categoria,
+                    resposta.origem AS origem,
+                    resposta.gravidade AS gravidade,
+                    resposta.responsavel_id AS responsavel_id,
+                    resposta.aprovado_por_id AS aprovado_por_id,
+                    resposta.data AS data_resposta,
+                    resposta.data_conclusao AS data_conclusao,
+                    resposta.data_fecho AS data_fecho,
+                    CASE
+                        WHEN resposta.data_fecho IS NOT NULL
+                        THEN resposta.data_fecho - {a}.create_date::date
+                        ELSE NULL
+                    END::float AS dias_para_fechar,
+                    CASE
+                        WHEN COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado'
+                        THEN CURRENT_DATE - {a}.create_date::date
+                        ELSE NULL
+                    END::float AS dias_em_aberto,
+                    (
+                        COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado'
+                        AND CURRENT_DATE - {a}.create_date::date > 7
+                    ) AS fora_sla_7,
+                    (
+                        COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado'
+                        AND CURRENT_DATE - {a}.create_date::date > 15
+                    ) AS fora_sla_15,
+                    (
+                        COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado'
+                        AND CURRENT_DATE - {a}.create_date::date > 30
+                    ) AS fora_sla_30,
+                    (
+                        COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado'
+                        AND resposta.data_conclusao IS NULL
+                    ) AS acoes_corretivas_pendentes,
+                    CASE WHEN COALESCE(resposta.estado_resposta, 'sem_resposta') = 'fechado' THEN 100 ELSE 0 END::float AS taxa_fecho,
+                    (COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado' AND CURRENT_DATE - {a}.create_date::date > 7)::int AS qtd_fora_sla_7,
+                    (COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado' AND CURRENT_DATE - {a}.create_date::date > 15)::int AS qtd_fora_sla_15,
+                    (COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado' AND CURRENT_DATE - {a}.create_date::date > 30)::int AS qtd_fora_sla_30,
+                    {ref_expr} AS reclamacao_ref,
+                    1 AS quantidade
+                FROM {tabela} {a}
+                LEFT JOIN LATERAL (
+                    SELECT {r}.*
+                    FROM {tabela_resposta} {r}
+                    WHERE {r}.reclamacao_id = {a}.id
+                    ORDER BY {r}.data DESC NULLS LAST, {r}.id DESC
+                    LIMIT 1
+                ) resposta ON TRUE
+"""
+
+_BLOCOS = [
+    dict(  # ids ímpares: clientes
+        a='cliente', r='resposta_cliente', entidade='cliente',
+        tabela='form_reclama_cliente', tabela_resposta='qualidade_resposta_cliente',
+        id_expr='(cliente.id * 2 - 1)',
+        tipo_expr="'cliente'",
+        ref_expr="'Cliente #' || cliente.id::varchar",
+    ),
+    dict(  # ids pares: fornecedores (externas e internas)
+        a='fornecedor', r='resposta_fornecedor', entidade='fornecedor',
+        tabela='form_reclama_fornecedor', tabela_resposta='qualidade_resposta_fornecedor',
+        id_expr='(fornecedor.id * 2)',
+        tipo_expr="(CASE WHEN fornecedor.tipo_reclamacao = 'interna' THEN 'interna' ELSE 'fornecedor' END)",
+        ref_expr="(CASE WHEN fornecedor.tipo_reclamacao = 'interna' THEN 'Interna #' ELSE 'Fornecedor #' END) || fornecedor.id::varchar",
+    ),
+]
+
 
 class QualidadeReclamacaoDashboard(models.Model):
     _name = 'qualidade.reclamacao.dashboard'
@@ -17,32 +99,11 @@ class QualidadeReclamacaoDashboard(models.Model):
     utilizador_id = fields.Many2one('res.users', string='Utilizador', readonly=True)
     responsavel_id = fields.Many2one('res.users', string='Responsável', readonly=True)
     aprovado_por_id = fields.Many2one('res.users', string='Aprovado por', readonly=True)
-    armazem = fields.Selection([
-        ('a1', 'A1 - Arruda'),
-        ('a2', 'A2 - Tomar'),
-        ('outra', 'Outra'),
-    ], string='Armazém', readonly=True)
-    estado_resposta = fields.Selection([
-        ('sem_resposta', 'Sem Resposta'),
-        ('aberto', 'Aberto'),
-        ('pendente', 'Pendente'),
-        ('fechado', 'Fechado'),
-    ], string='Estado', readonly=True)
-    categoria = fields.Selection([
-        ('qualidade', 'Qualidade'),
-        ('seguranca', 'Segurança'),
-        ('servico', 'Serviço (Transporte)'),
-    ], string='Categoria', readonly=True)
-    origem = fields.Selection([
-        ('a1', 'A1 - Arruda'),
-        ('a2', 'A2 - Tomar'),
-    ], string='Origem', readonly=True)
-    gravidade = fields.Selection([
-        ('baixa', 'Baixa'),
-        ('media', 'Média'),
-        ('alta', 'Alta'),
-        ('critica', 'Crítica'),
-    ], string='Gravidade', readonly=True)
+    armazem = fields.Selection(ARMAZENS, string='Armazém', readonly=True)
+    estado_resposta = fields.Selection([('sem_resposta', 'Sem Resposta')] + ESTADOS_RESPOSTA, string='Estado', readonly=True)
+    categoria = fields.Selection(CATEGORIAS, string='Categoria', readonly=True)
+    origem = fields.Selection(ORIGENS, string='Origem', readonly=True)
+    gravidade = fields.Selection(GRAVIDADES, string='Gravidade', readonly=True)
     codigo_artigo = fields.Char(string='Código Artigo', readonly=True)
     descricao_artigo = fields.Char(string='Descrição Artigo', readonly=True)
     data_criacao = fields.Datetime(string='Data da Reclamação', readonly=True)
@@ -64,130 +125,11 @@ class QualidadeReclamacaoDashboard(models.Model):
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
+        blocos = '\n                UNION ALL\n'.join(_SQL_BLOCO.format(**b) for b in _BLOCOS)
         self.env.cr.execute("""
-            CREATE OR REPLACE VIEW %s AS (
-                SELECT
-                    (cliente.id * 2 - 1) AS id,
-                    'cliente'::varchar AS tipo,
-                    cliente.cliente AS entidade,
-                    cliente.user_id AS utilizador_id,
-                    cliente.armazem AS armazem,
-                    cliente.codigo_artigo AS codigo_artigo,
-                    cliente.descricao_artigo AS descricao_artigo,
-                    cliente.create_date AS data_criacao,
-                    COALESCE(resposta.estado_resposta, 'sem_resposta') AS estado_resposta,
-                    resposta.categoria AS categoria,
-                    resposta.origem AS origem,
-                    resposta.gravidade AS gravidade,
-                    resposta.responsavel_id AS responsavel_id,
-                    resposta.aprovado_por_id AS aprovado_por_id,
-                    resposta.data AS data_resposta,
-                    resposta.data_conclusao AS data_conclusao,
-                    resposta.data_fecho AS data_fecho,
-                    CASE
-                        WHEN resposta.data_fecho IS NOT NULL
-                        THEN resposta.data_fecho - cliente.create_date::date
-                        ELSE NULL
-                    END::float AS dias_para_fechar,
-                    CASE
-                        WHEN COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado'
-                        THEN CURRENT_DATE - cliente.create_date::date
-                        ELSE NULL
-                    END::float AS dias_em_aberto,
-                    (
-                        COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado'
-                        AND CURRENT_DATE - cliente.create_date::date > 7
-                    ) AS fora_sla_7,
-                    (
-                        COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado'
-                        AND CURRENT_DATE - cliente.create_date::date > 15
-                    ) AS fora_sla_15,
-                    (
-                        COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado'
-                        AND CURRENT_DATE - cliente.create_date::date > 30
-                    ) AS fora_sla_30,
-                    (
-                        COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado'
-                        AND resposta.data_conclusao IS NULL
-                    ) AS acoes_corretivas_pendentes,
-                    CASE WHEN COALESCE(resposta.estado_resposta, 'sem_resposta') = 'fechado' THEN 100 ELSE 0 END::float AS taxa_fecho,
-                    (COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado' AND CURRENT_DATE - cliente.create_date::date > 7)::int AS qtd_fora_sla_7,
-                    (COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado' AND CURRENT_DATE - cliente.create_date::date > 15)::int AS qtd_fora_sla_15,
-                    (COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado' AND CURRENT_DATE - cliente.create_date::date > 30)::int AS qtd_fora_sla_30,
-                    'Cliente #' || cliente.id::varchar AS reclamacao_ref,
-                    1 AS quantidade
-                FROM form_reclama_cliente cliente
-                LEFT JOIN LATERAL (
-                    SELECT resposta_cliente.*
-                    FROM qualidade_resposta_cliente resposta_cliente
-                    WHERE resposta_cliente.reclamacao_id = cliente.id
-                    ORDER BY resposta_cliente.data DESC NULLS LAST, resposta_cliente.id DESC
-                    LIMIT 1
-                ) resposta ON TRUE
-
-                UNION ALL
-
-                SELECT
-                    (fornecedor.id * 2) AS id,
-                    (CASE WHEN fornecedor.tipo_reclamacao = 'interna' THEN 'interna' ELSE 'fornecedor' END)::varchar AS tipo,
-                    fornecedor.fornecedor AS entidade,
-                    fornecedor.user_id AS utilizador_id,
-                    fornecedor.armazem AS armazem,
-                    fornecedor.codigo_artigo AS codigo_artigo,
-                    fornecedor.descricao_artigo AS descricao_artigo,
-                    fornecedor.create_date AS data_criacao,
-                    COALESCE(resposta.estado_resposta, 'sem_resposta') AS estado_resposta,
-                    resposta.categoria AS categoria,
-                    resposta.origem AS origem,
-                    resposta.gravidade AS gravidade,
-                    resposta.responsavel_id AS responsavel_id,
-                    resposta.aprovado_por_id AS aprovado_por_id,
-                    resposta.data AS data_resposta,
-                    resposta.data_conclusao AS data_conclusao,
-                    resposta.data_fecho AS data_fecho,
-                    CASE
-                        WHEN resposta.data_fecho IS NOT NULL
-                        THEN resposta.data_fecho - fornecedor.create_date::date
-                        ELSE NULL
-                    END::float AS dias_para_fechar,
-                    CASE
-                        WHEN COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado'
-                        THEN CURRENT_DATE - fornecedor.create_date::date
-                        ELSE NULL
-                    END::float AS dias_em_aberto,
-                    (
-                        COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado'
-                        AND CURRENT_DATE - fornecedor.create_date::date > 7
-                    ) AS fora_sla_7,
-                    (
-                        COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado'
-                        AND CURRENT_DATE - fornecedor.create_date::date > 15
-                    ) AS fora_sla_15,
-                    (
-                        COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado'
-                        AND CURRENT_DATE - fornecedor.create_date::date > 30
-                    ) AS fora_sla_30,
-                    (
-                        COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado'
-                        AND resposta.data_conclusao IS NULL
-                    ) AS acoes_corretivas_pendentes,
-                    CASE WHEN COALESCE(resposta.estado_resposta, 'sem_resposta') = 'fechado' THEN 100 ELSE 0 END::float AS taxa_fecho,
-                    (COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado' AND CURRENT_DATE - fornecedor.create_date::date > 7)::int AS qtd_fora_sla_7,
-                    (COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado' AND CURRENT_DATE - fornecedor.create_date::date > 15)::int AS qtd_fora_sla_15,
-                    (COALESCE(resposta.estado_resposta, 'sem_resposta') != 'fechado' AND CURRENT_DATE - fornecedor.create_date::date > 30)::int AS qtd_fora_sla_30,
-                    (CASE WHEN fornecedor.tipo_reclamacao = 'interna' THEN 'Interna #' ELSE 'Fornecedor #' END) || fornecedor.id::varchar AS reclamacao_ref,
-                    1 AS quantidade
-                FROM form_reclama_fornecedor fornecedor
-                LEFT JOIN LATERAL (
-                    SELECT resposta_fornecedor.*
-                    FROM qualidade_resposta_fornecedor resposta_fornecedor
-                    WHERE resposta_fornecedor.reclamacao_id = fornecedor.id
-                    ORDER BY resposta_fornecedor.data DESC NULLS LAST, resposta_fornecedor.id DESC
-                    LIMIT 1
-                ) resposta ON TRUE
+            CREATE OR REPLACE VIEW %s AS (%s
             )
-        """ % self._table)
-
+        """ % (self._table, blocos))
 
 class QualidadeReclamacaoKpi(models.Model):
     _name = 'qualidade.reclamacao.kpi'
