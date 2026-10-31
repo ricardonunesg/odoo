@@ -1,0 +1,32 @@
+<odoo>
+  <!-- noupdate: as actualizações do módulo nunca repõem estas séries nem os contadores -->
+  <data noupdate="1">
+    <record id="seq_reclamacao_cliente" model="ir.sequence">
+      <field name="name">Reclamações de Clientes</field>
+      <field name="code">formularios.reclamacao.cliente</field>
+      <field name="prefix">RCL/%(range_year)s/</field>
+      <field name="padding">4</field>
+      <field name="implementation">no_gap</field>
+      <field name="use_date_range" eval="True"/>
+      <field name="company_id" eval="False"/>
+    </record>
+    <record id="seq_reclamacao_fornecedor" model="ir.sequence">
+      <field name="name">Reclamações de Fornecedores</field>
+      <field name="code">formularios.reclamacao.fornecedor</field>
+      <field name="prefix">RFO/%(range_year)s/</field>
+      <field name="padding">4</field>
+      <field name="implementation">no_gap</field>
+      <field name="use_date_range" eval="True"/>
+      <field name="company_id" eval="False"/>
+    </record>
+    <record id="seq_reclamacao_interna" model="ir.sequence">
+      <field name="name">Reclamações Internas</field>
+      <field name="code">formularios.reclamacao.interna</field>
+      <field name="prefix">RIN/%(range_year)s/</field>
+      <field name="padding">4</field>
+      <field name="implementation">no_gap</field>
+      <field name="use_date_range" eval="True"/>
+      <field name="company_id" eval="False"/>
+    </record>
+  </data>
+</odoo>

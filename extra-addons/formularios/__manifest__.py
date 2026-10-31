@@ -1,15 +1,17 @@
 {
     'web_icon': 'formularios/static/description/icon.png',
     'name': 'Formulários',
-    'version': '1.3.0',
+    'version': '1.4.0',
     'summary': 'Formulários de reclamações (Cliente e Fornecedor)',
     'category': 'Operations',
     'author': 'A tua empresa',
     'depends': ['base', 'mail', 'primavera_connector'],
     'data': [
         'security/ir.model.access.csv',
+        'data/numeracoes.xml',
         'views/form_cliente_views.xml',
         'views/form_fornecedor_views.xml',
+        'views/corrigir_tipo_views.xml',
         'views/menu.xml',
         'report/form_cliente_report.xml',
         'report/form_fornecedor_report.xml',

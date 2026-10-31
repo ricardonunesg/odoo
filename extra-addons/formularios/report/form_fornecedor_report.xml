@@ -6,7 +6,7 @@
       <field name="report_type">qweb-pdf</field>
       <field name="report_name">formularios.report_form_fornecedor_document</field>
       <field name="report_file">formularios.report_form_fornecedor_document</field>
-      <field name="print_report_name">'Formulario_Fornecedor_%s' % (object.id)</field>
+      <field name="print_report_name">'Formulario_Fornecedor_%s' % ((object.name or str(object.id)).replace('/', '-'))</field>
       <field name="binding_model_id" eval="False"/>
       <field name="binding_type">report</field>
       <field name="binding_view_types"></field>
@@ -18,8 +18,9 @@
           <t t-call="web.external_layout">
             <div class="page">
               <t t-set="interna" t-value="o.tipo_reclamacao == 'interna'"/>
-              <h2 t-if="interna">Formulário de Reclamação - Interna</h2>
-              <h2 t-else="">Formulário de Reclamação - Fornecedor</h2>
+              <h2 t-if="interna">Formulário de Reclamação - Interna<t t-if="o.name"> - <span t-esc="o.name"/></t></h2>
+              <h2 t-else="">Formulário de Reclamação - Fornecedor<t t-if="o.name"> - <span t-esc="o.name"/></t></h2>
+              <p t-if="o.numeros_anteriores"><strong>Números anteriores:</strong> <span t-esc="o.numeros_anteriores"/></p>
               <p><strong>Utilizador:</strong> <span t-esc="o.user_id.name"/></p>
               <p><strong>Armazém:</strong> <span t-esc="dict(o._fields['armazem'].selection).get(o.armazem)"/></p>
               <p t-if="interna"><strong>Instalação Reclamada:</strong> <span t-esc="dict(o._fields['instalacao_reclamada'].selection).get(o.instalacao_reclamada)"/></p>

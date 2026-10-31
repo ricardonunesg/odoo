@@ -3,7 +3,7 @@ from odoo import fields, models, tools
 from .constantes import ARMAZENS, ESTADOS_RESPOSTA, CATEGORIAS, ORIGENS, GRAVIDADES
 
 # Um bloco SELECT por origem (clientes / fornecedores). O SQL é igual nos dois:
-# só mudam a tabela, o alias, o id, o tipo, a entidade e a referência.
+# só mudam a tabela, o alias, o id, o tipo, a entidade e a referência (número da reclamação).
 _SQL_BLOCO = """
                 SELECT
                     {id_expr} AS id,
@@ -71,14 +71,14 @@ _BLOCOS = [
         tabela='form_reclama_cliente', tabela_resposta='qualidade_resposta_cliente',
         id_expr='(cliente.id * 2 - 1)',
         tipo_expr="'cliente'",
-        ref_expr="'Cliente #' || cliente.id::varchar",
+        ref_expr="COALESCE(cliente.name, 'Cliente #' || cliente.id::varchar)",
     ),
     dict(  # ids pares: fornecedores (externas e internas)
         a='fornecedor', r='resposta_fornecedor', entidade='fornecedor',
         tabela='form_reclama_fornecedor', tabela_resposta='qualidade_resposta_fornecedor',
         id_expr='(fornecedor.id * 2)',
         tipo_expr="(CASE WHEN fornecedor.tipo_reclamacao = 'interna' THEN 'interna' ELSE 'fornecedor' END)",
-        ref_expr="(CASE WHEN fornecedor.tipo_reclamacao = 'interna' THEN 'Interna #' ELSE 'Fornecedor #' END) || fornecedor.id::varchar",
+        ref_expr="COALESCE(fornecedor.name, (CASE WHEN fornecedor.tipo_reclamacao = 'interna' THEN 'Interna #' ELSE 'Fornecedor #' END) || fornecedor.id::varchar)",
     ),
 ]
 

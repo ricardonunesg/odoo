@@ -1,5 +1,5 @@
 from odoo import models, fields, api
-from odoo.exceptions import ValidationError
+from odoo.exceptions import ValidationError, UserError
 import base64
 
 from .constantes import EMAILS_FIXOS, ARMAZENS
@@ -22,6 +22,16 @@ class ReclamacaoBase(models.AbstractModel):
     _modelo_linha = None        # 'form.reclama.cliente.linha' / 'form.reclama.fornecedor.linha'
     _relatorio = None           # xmlid do relatório PDF
     _prefixo_pdf = None         # 'Formulario_Cliente' / 'Formulario_Fornecedor'
+    _campos_numeracao = ('name',)   # só mudam pela numeração automática (contexto formularios_numeracao)
+
+    # Número próprio (RCL/2026/0001, RFO/..., RIN/...): atribuído ao gravar, antes do PDF e do email.
+    # Séries sem saltos e anuais em data/numeracoes.xml (noupdate: as actualizações não repõem os contadores).
+    name = fields.Char(string='Número', readonly=True, copy=False, index=True,
+                       help='Atribuído automaticamente ao gravar. Nunca se repete.')
+
+    _sql_constraints = [
+        ('name_uniq', 'unique(name)', 'Já existe uma reclamação com este número.'),
+    ]
 
     user_id = fields.Many2one('res.users', string='Utilizador', required=True)
     armazem = fields.Selection(ARMAZENS, string='Armazém', required=True)
@@ -97,6 +107,26 @@ class ReclamacaoBase(models.AbstractModel):
                 vals['descricao_artigo'] = product.name
         return vals_list
 
+    def _codigo_numeracao(self, vals):
+        """Código da série (ir.sequence) de uma reclamação com estes valores."""
+        raise NotImplementedError
+
+    def _proximo_numero(self, codigo, data):
+        """Próximo número da série 'codigo' para o ano de 'data'. Série sem saltos: o contador só avança
+        se a transacção for gravada, e duas gravações simultâneas esperam uma pela outra."""
+        numero = self.env['ir.sequence'].sudo().next_by_code(codigo, sequence_date=data)
+        if not numero:
+            raise UserError("Falta a numeração '%s'. Contacte o administrador do Odoo." % codigo)
+        return numero
+
+    def _nome_com_numero(self):
+        for rec in self:
+            nome = rec[self._campo_nome] or ''
+            rec.display_name = '%s - %s' % (rec.name, nome) if rec.name else nome
+
+    def _numero_ficheiro(self):
+        return (self.name or str(self.id)).replace('/', '-')
+
     def _textos_email(self):
         """Devolve (introdução, linha da entidade, assunto) do email de nova reclamação."""
         raise NotImplementedError
@@ -111,7 +141,7 @@ class ReclamacaoBase(models.AbstractModel):
         )
 
         attachment = self.env['ir.attachment'].sudo().create({
-            'name': f'{self._prefixo_pdf}_{self.id}.pdf',
+            'name': f'{self._prefixo_pdf}_{self._numero_ficheiro()}.pdf',
             'type': 'binary',
             'datas': base64.b64encode(pdf_content),
             'mimetype': 'application/pdf',
@@ -131,6 +161,7 @@ class ReclamacaoBase(models.AbstractModel):
             linhas_html += '</table>'
         intro, entidade, assunto = self._textos_email()
         body = f'''
+            <p><strong>Reclamação n.º:</strong> {self.name or ''}</p>
             <p>{intro}</p>
             <p><strong>Utilizador:</strong> {self.user_id.name or ''}</p>
             <p><strong>Armazém:</strong> {dict(self._fields['armazem'].selection).get(self.armazem, '')}</p>
@@ -159,6 +190,10 @@ class ReclamacaoBase(models.AbstractModel):
     def create(self, vals_list):
         vals_list = self._prepare_partner_names(vals_list)
         vals_list = self._prepare_product_values(vals_list)
+        hoje = fields.Date.context_today(self)
+        for vals in vals_list:
+            # sempre da série: um número vindo de fora é ignorado
+            vals['name'] = self._proximo_numero(self._codigo_numeracao(vals), hoje)
         records = super().create(vals_list)
         Linha = self.env[self._modelo_linha]
         for rec in records:
@@ -177,6 +212,8 @@ class ReclamacaoBase(models.AbstractModel):
         return records
 
     def write(self, vals):
+        if set(vals) & set(self._campos_numeracao) and not self.env.context.get('formularios_numeracao'):
+            raise UserError("O número da reclamação é atribuído automaticamente e não pode ser alterado.")
         if vals.get(self._campo_parceiro) and not vals.get(self._campo_nome):
             partner = self.env['res.partner'].browse(vals[self._campo_parceiro]).exists()
             if partner:

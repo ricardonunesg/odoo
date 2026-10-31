@@ -5,6 +5,7 @@
       <field name="model">qualidade.reclamacao.dashboard</field>
       <field name="arch" type="xml">
         <search string="Dashboard Reclamações">
+          <field name="reclamacao_ref"/>
           <field name="entidade"/>
           <field name="codigo_artigo"/>
           <field name="tipo"/>

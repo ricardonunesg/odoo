@@ -6,7 +6,7 @@
       <field name="report_type">qweb-pdf</field>
       <field name="report_name">formularios.report_form_cliente_document</field>
       <field name="report_file">formularios.report_form_cliente_document</field>
-      <field name="print_report_name">'Formulario_Cliente_%s' % (object.id)</field>
+      <field name="print_report_name">'Formulario_Cliente_%s' % ((object.name or str(object.id)).replace('/', '-'))</field>
       <field name="binding_model_id" eval="False"/>
       <field name="binding_type">report</field>
       <field name="binding_view_types"></field>
@@ -17,7 +17,7 @@
         <t t-foreach="docs" t-as="o">
           <t t-call="web.external_layout">
             <div class="page">
-              <h2>Formulário de Reclamação - Cliente</h2>
+              <h2>Formulário de Reclamação - Cliente<t t-if="o.name"> - <span t-esc="o.name"/></t></h2>
               <p><strong>Utilizador:</strong> <span t-esc="o.user_id.name"/></p>
               <p><strong>Armazém:</strong> <span t-esc="dict(o._fields['armazem'].selection).get(o.armazem)"/></p>
               <p><strong>Cliente:</strong> <span t-esc="o.cliente"/></p>

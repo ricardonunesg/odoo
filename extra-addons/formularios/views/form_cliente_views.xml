@@ -9,6 +9,12 @@
             <button name="action_imprimir_pdf" type="object" string="Imprimir PDF" class="btn-primary" invisible="not id"/>
           </header>
           <sheet>
+            <div class="oe_title">
+              <h1>
+                <field name="name" readonly="1" invisible="not id"/>
+                <span invisible="id">Nova reclamação</span>
+              </h1>
+            </div>
             <group>
               <field name="user_id"/>
               <field name="armazem"/>

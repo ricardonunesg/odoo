@@ -8,6 +8,7 @@ class FormReclamacaoCliente(models.Model):
     _inherit = ['formularios.reclamacao.base']
     _description = 'Formulário - Reclamações de Cliente'
     _rec_name = 'cliente'
+    _rec_names_search = ['name', 'cliente']
 
     _campo_parceiro = 'cliente_partner_id'
     _campo_nome = 'cliente'
@@ -44,9 +45,16 @@ class FormReclamacaoCliente(models.Model):
         for rec in self:
             rec.cliente = rec.cliente_partner_id.display_name or False
 
+    @api.depends('name', 'cliente')
+    def _compute_display_name(self):
+        self._nome_com_numero()
+
+    def _codigo_numeracao(self, vals):
+        return 'formularios.reclamacao.cliente'
+
     def _textos_email(self):
         return (
             'Foi criado um novo formulário de reclamação de cliente.',
             f"<strong>Cliente:</strong> {self.cliente or ''}",
-            f'Nova Reclamação de Cliente - {self.cliente or ""}',
+            f'Nova Reclamação de Cliente - {self.name} - {self.cliente or ""}',
         )

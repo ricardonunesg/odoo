@@ -1,0 +1,32 @@
+<odoo>
+  <data>
+    <record id="view_corrigir_tipo_form" model="ir.ui.view">
+      <field name="name">formularios.corrigir.tipo.form</field>
+      <field name="model">formularios.corrigir.tipo</field>
+      <field name="arch" type="xml">
+        <form string="Corrigir tipo da reclamação">
+          <div class="alert alert-warning" role="alert">
+            A reclamação vai receber um <strong>número novo</strong> da série do novo tipo (no ano da reclamação original).
+            O número actual fica guardado em "Números anteriores", continua pesquisável e nunca é reutilizado.
+            Não é enviado nenhum email.
+          </div>
+          <group>
+            <field name="reclamacao_id"/>
+            <field name="numero_atual"/>
+            <field name="tipo_atual"/>
+            <field name="novo_tipo" widget="radio" options="{'horizontal': true}"/>
+            <field name="instalacao_reclamada" invisible="novo_tipo != 'interna'" required="novo_tipo == 'interna'"/>
+            <field name="fornecedor_partner_id" invisible="novo_tipo != 'externa'" required="novo_tipo == 'externa'"
+                   options="{'no_create': True, 'no_create_edit': True}"/>
+            <field name="motivo" placeholder="Porque é que o tipo está errado?"/>
+          </group>
+          <footer>
+            <button name="action_confirmar" type="object" string="Corrigir tipo" class="btn-primary"
+                    confirm="Confirma a correcção do tipo? Vai ser atribuído um número novo e o actual passa a número anterior."/>
+            <button string="Cancelar" special="cancel" class="btn-secondary"/>
+          </footer>
+        </form>
+      </field>
+    </record>
+  </data>
+</odoo>
