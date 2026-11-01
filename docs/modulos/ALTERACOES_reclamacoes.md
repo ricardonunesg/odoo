@@ -3,6 +3,16 @@
 Cópias dos documentos oficiais em `/srv/partilhada/Modulos ODOO_Relatórios/` (3.Formularios.docx,
 10. Qualidade_Reclamacoes.docx, 0.Indice_Modulos.docx), guardadas aqui para histórico.
 
+## 01/11/2026 — Fase 2, Ponto 1: ficha do Responder (qualidade_reclamacoes 18.0.1.6.0)
+
+- Campo "Reclamação" da resposta só de leitura (sem abrir a ficha dos Formulários nem escolher outra); o servidor
+  recusa mudar uma resposta para outra reclamação.
+- Link "Imprimir PDF da reclamação" na ficha do Responder: abre o PDF noutro separador, também numa resposta por
+  gravar, sem criar respostas; sem sessão iniciada leva ao login.
+- Produção (01/11 20:16, commit 219b23f): só a Qualidade, 0 erros novos, históricos/indicadores/numerações iguais,
+  testes 31/31 (+ P11 47/47, P5 11/11, P1 25/25).
+- Reversão: /home/odoo/backups/REVERSAO_f2p1_resposta.md
+
 ## 01/11/2026 — Ponto 5: artigos no Dashboard (qualidade_reclamacoes 18.0.1.5.0)
 
 - O painel passa a mostrar todos os artigos das linhas de cada reclamação (antes: campo antigo do cabeçalho, 25 de 61
