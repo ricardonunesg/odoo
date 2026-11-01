@@ -1,7 +1,7 @@
 {
     'web_icon': 'qualidade_reclamacoes/static/description/icon.png',
     'name': 'Qualidade - Reclamações',
-    'version': '1.6.0',
+    'version': '1.7.0',
     'summary': 'Gestão de reclamações por Qualidade (respostas e estado)',
     'category': 'Operations',
     'author': 'A tua empresa',
@@ -15,5 +15,11 @@
         'views/qualidade_fornecedor_views.xml',
         'views/menu.xml',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'qualidade_reclamacoes/static/src/anexos_preview/anexos_preview_field.js',
+            'qualidade_reclamacoes/static/src/anexos_preview/anexos_preview_field.xml',
+        ],
+    },
     'application': True,
 }

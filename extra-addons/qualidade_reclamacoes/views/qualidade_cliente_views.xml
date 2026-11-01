@@ -24,7 +24,7 @@
               <field name="armazem" readonly="1"/>
               <field name="cliente" readonly="1"/>
               <field name="descricao_reclamacao" readonly="1"/>
-              <field name="anexos_formulario_ids" widget="many2many_binary" readonly="1"/>
+              <field name="anexos_formulario_ids" widget="qualidade_anexos_preview" readonly="1"/>
             </group>
 
             <group string="Artigos da Reclamação">
@@ -54,7 +54,7 @@
             </group>
 
             <group string="Evidências / Anexos">
-              <field name="anexos_ids" widget="many2many_binary"/>
+              <field name="anexos_ids" widget="qualidade_anexos_preview"/>
             </group>
           </sheet>
         </form>

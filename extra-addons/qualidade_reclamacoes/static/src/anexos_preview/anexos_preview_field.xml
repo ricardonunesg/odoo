@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- Mesmo aspecto do campo de anexos do Odoo; só muda o clique nos ficheiros que se podem ver -->
+    <t t-name="qualidade_reclamacoes.AnexosPreviewField" t-inherit="web.Many2ManyBinaryField" t-inherit-mode="primary">
+        <xpath expr="//t[@t-call='web.Many2ManyBinaryField.attachment_preview']" position="attributes">
+            <attribute name="t-call">qualidade_reclamacoes.AnexosPreviewField.anexo</attribute>
+        </xpath>
+    </t>
+
+    <t t-name="qualidade_reclamacoes.AnexosPreviewField.anexo" t-inherit="web.Many2ManyBinaryField.attachment_preview" t-inherit-mode="primary">
+        <xpath expr="//div[hasclass('o_image_box')]" position="attributes">
+            <attribute name="t-att-data-tooltip">(podeVer(file) ? 'Ver ' : 'Descarregar ') + file.name</attribute>
+        </xpath>
+        <xpath expr="//div[hasclass('o_image_box')]/a" position="attributes">
+            <attribute name="t-on-click">(ev) => this.onCliqueAnexo(ev, file)</attribute>
+        </xpath>
+        <xpath expr="//div[hasclass('caption')][1]/a" position="attributes">
+            <attribute name="t-att-data-tooltip">(podeVer(file) ? 'Ver ' : 'Descarregar ') + file.name</attribute>
+            <attribute name="t-on-click">(ev) => this.onCliqueAnexo(ev, file)</attribute>
+        </xpath>
+    </t>
+
+</templates>
