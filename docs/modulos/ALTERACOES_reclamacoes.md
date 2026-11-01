@@ -3,6 +3,15 @@
 Cópias dos documentos oficiais em `/srv/partilhada/Modulos ODOO_Relatórios/` (3.Formularios.docx,
 10. Qualidade_Reclamacoes.docx, 0.Indice_Modulos.docx), guardadas aqui para histórico.
 
+## 01/11/2026 — Fase 2, Ponto 2: pré-visualização de anexos (qualidade_reclamacoes 18.0.1.7.0)
+
+- Ficha do Responder: anexos do formulário e evidências da Qualidade abrem no visualizador nativo do Odoo
+  (imagens, PDF, vídeo); Excel, Word, ZIP e links do Google Drive como antes; permissões iguais.
+- Esc / botão X fecham só o visualizador (a ficha e o texto por gravar mantêm-se).
+- Produção (01/11 23:30, commit 07e7f7c): só a Qualidade, 0 erros na actualização, verificação no browser 9/9,
+  nenhuma resposta gravada pela verificação; mudam só as 2 vistas das respostas e a versão.
+- Reversão: /home/odoo/backups/REVERSAO_f2p2_anexos.md
+
 ## 01/11/2026 — Fase 2, Ponto 1: ficha do Responder (qualidade_reclamacoes 18.0.1.6.0)
 
 - Campo "Reclamação" da resposta só de leitura (sem abrir a ficha dos Formulários nem escolher outra); o servidor
