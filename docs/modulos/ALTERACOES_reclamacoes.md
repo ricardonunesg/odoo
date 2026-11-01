@@ -3,6 +3,19 @@
 Cópias dos documentos oficiais em `/srv/partilhada/Modulos ODOO_Relatórios/` (3.Formularios.docx,
 10. Qualidade_Reclamacoes.docx, 0.Indice_Modulos.docx), guardadas aqui para histórico.
 
+## 01/11/2026 — Ponto 6: numeração RCL / RFO / RIN (formularios 18.0.1.4.0, qualidade_reclamacoes 18.0.1.3.0)
+
+- Número automático e anual, sem saltos nem repetidos: RCL (clientes), RFO (fornecedores), RIN (internas); faixas 2026-2035.
+- Atribuído ao gravar, antes do PDF e do email: assunto, corpo, título do PDF e nome do ficheiro PDF.
+- 61 históricas numeradas por data de criação (lista em /home/odoo/backups/mapa_numeracao_historica_2026-10-31.csv).
+- "Corrigir tipo" (só administradores): motivo + confirmação, número novo do ano original, números anteriores pesquisáveis.
+- Ensaio isolado: 66/66, simultaneidade sem repetidos/buracos, 2.ª actualização sem recuo, reversão com números repostos.
+- Produção (01/11 18:16, commit ca2d9eb): 61/61 iguais à lista, dados históricos idênticos, contadores 36/27/1, 0 erros.
+  1.ª tentativa de cópia falhou (3 ficheiros de root, iguais nas duas versões) e foi revertida antes de qualquer alteração.
+- Testes reais: TESTE-RCL/2026/0001, TESTE-RFO/2026/0001, TESTE-RIN/2026/0001 (números de teste em memória; email só para o
+  Gonçalo; contadores oficiais intactos). Ficam em produção para o Gonçalo experimentar e apagar.
+- Reversão: /home/odoo/backups/REVERSAO_p6_numeracao.md (começa por guardar_numeracao_antes_de_reverter.sql).
+
 ## 31/10/2026 — Ponto 12: reorganização do código (formularios 18.0.1.3.0, qualidade_reclamacoes 18.0.1.2.0)
 
 - Sem alteração de funcionamento: formulários, respostas, menus, vistas, PDFs, emails, painéis, permissões e dados iguais.
