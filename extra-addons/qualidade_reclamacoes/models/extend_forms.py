@@ -13,22 +13,32 @@ class QualidadeUltimaRespostaMixin(models.AbstractModel):
     _modelo_resposta = None
     _titulo_responder = None
 
-    ultima_resposta_estado = fields.Selection(ESTADOS_RESPOSTA, string='Estado Resposta', compute='_compute_ultima_resposta')
-    ultima_responsavel_id = fields.Many2one('res.users', string='Responsável', compute='_compute_ultima_resposta')
-    ultima_aprovado_por_id = fields.Many2one('res.users', string='Aprovado por', compute='_compute_ultima_resposta')
-    ultima_data_conclusao = fields.Date(string='Data Conclusão', compute='_compute_ultima_resposta')
-    ultima_categoria = fields.Selection(CATEGORIAS, string='Categoria', compute='_compute_ultima_resposta')
-    ultima_origem = fields.Selection(ORIGENS, string='Origem', compute='_compute_ultima_resposta')
-    ultima_gravidade = fields.Selection(GRAVIDADES, string='Gravidade', compute='_compute_ultima_resposta')
+    # Guardados (para filtrar e agrupar nas listas da Qualidade); recalculados sempre que uma resposta
+    # é criada, alterada (incluindo a data) ou eliminada. Sem respostas ficam vazios ("Sem resposta").
+    ultima_resposta_estado = fields.Selection(ESTADOS_RESPOSTA, string='Estado Resposta', compute='_compute_ultima_resposta_guardada', store=True)
+    ultima_responsavel_id = fields.Many2one('res.users', string='Responsável', compute='_compute_ultima_resposta_guardada', store=True)
+    ultima_aprovado_por_id = fields.Many2one('res.users', string='Aprovado por', compute='_compute_ultima_resposta_guardada', store=True)
+    ultima_data_conclusao = fields.Date(string='Data Conclusão', compute='_compute_ultima_resposta_guardada', store=True)
+    ultima_categoria = fields.Selection(CATEGORIAS, string='Categoria', compute='_compute_ultima_resposta_guardada', store=True)
+    ultima_origem = fields.Selection(ORIGENS, string='Origem', compute='_compute_ultima_resposta_guardada', store=True)
+    ultima_gravidade = fields.Selection(GRAVIDADES, string='Gravidade', compute='_compute_ultima_resposta_guardada', store=True)
+    ultima_data_fecho = fields.Date(string='Data Fecho', compute='_compute_ultima_resposta_guardada', store=True)
 
+    # Textos longos: continuam calculados só quando se vêem
     ultima_causa = fields.Text(string='Causa', compute='_compute_ultima_resposta')
     ultima_acoes_corretivas = fields.Text(string='Ações Corretivas', compute='_compute_ultima_resposta')
     ultima_verificacao_eficacia = fields.Text(string='Verificação Eficácia', compute='_compute_ultima_resposta')
-    ultima_data_fecho = fields.Date(string='Data Fecho', compute='_compute_ultima_resposta')
     ultima_observacoes = fields.Text(string='Observações', compute='_compute_ultima_resposta')
+
+    def _ultima_resposta(self):
+        """A última resposta: a de data mais recente (em empate, a criada por último)."""
+        self.ensure_one()
+        respostas = self.resposta_ids.sorted(key=lambda r: (r.data or fields.Date.today(), r.id))
+        return respostas[-1] if respostas else False
 
     @api.depends(
         'resposta_ids',
+        'resposta_ids.data',
         'resposta_ids.estado_resposta',
         'resposta_ids.responsavel_id',
         'resposta_ids.aprovado_por_id',
@@ -36,16 +46,11 @@ class QualidadeUltimaRespostaMixin(models.AbstractModel):
         'resposta_ids.categoria',
         'resposta_ids.origem',
         'resposta_ids.gravidade',
-        'resposta_ids.causa',
-        'resposta_ids.acoes_corretivas',
-        'resposta_ids.verificacao_eficacia',
         'resposta_ids.data_fecho',
-        'resposta_ids.observacoes',
     )
-    def _compute_ultima_resposta(self):
+    def _compute_ultima_resposta_guardada(self):
         for rec in self:
-            respostas = rec.resposta_ids.sorted(key=lambda r: (r.data or fields.Date.today(), r.id))
-            ultima = respostas[-1] if respostas else False
+            ultima = rec._ultima_resposta()
             rec.ultima_resposta_estado = ultima.estado_resposta if ultima else False
             rec.ultima_responsavel_id = ultima.responsavel_id if ultima else False
             rec.ultima_aprovado_por_id = ultima.aprovado_por_id if ultima else False
@@ -53,10 +58,22 @@ class QualidadeUltimaRespostaMixin(models.AbstractModel):
             rec.ultima_categoria = ultima.categoria if ultima else False
             rec.ultima_origem = ultima.origem if ultima else False
             rec.ultima_gravidade = ultima.gravidade if ultima else False
+            rec.ultima_data_fecho = ultima.data_fecho if ultima else False
+
+    @api.depends(
+        'resposta_ids',
+        'resposta_ids.data',
+        'resposta_ids.causa',
+        'resposta_ids.acoes_corretivas',
+        'resposta_ids.verificacao_eficacia',
+        'resposta_ids.observacoes',
+    )
+    def _compute_ultima_resposta(self):
+        for rec in self:
+            ultima = rec._ultima_resposta()
             rec.ultima_causa = ultima.causa if ultima else False
             rec.ultima_acoes_corretivas = ultima.acoes_corretivas if ultima else False
             rec.ultima_verificacao_eficacia = ultima.verificacao_eficacia if ultima else False
-            rec.ultima_data_fecho = ultima.data_fecho if ultima else False
             rec.ultima_observacoes = ultima.observacoes if ultima else False
 
     def _abrir_resposta(self):

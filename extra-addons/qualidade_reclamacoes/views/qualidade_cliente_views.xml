@@ -106,6 +106,39 @@
         <search>
           <field name="name" string="Número"/>
           <field name="cliente"/>
+          <!-- artigo e lote: procuram em todas as linhas da reclamação e nos campos antigos de artigo único -->
+          <field name="codigo_artigo" string="Artigo" filter_domain="['|', '|', '|', ('linha_ids.codigo_artigo', 'ilike', self), ('linha_ids.descricao_artigo', 'ilike', self), ('codigo_artigo', 'ilike', self), ('descricao_artigo', 'ilike', self)]"/>
+          <field name="lote" string="Lote" filter_domain="['|', ('linha_ids.lote', 'ilike', self), ('lote', 'ilike', self)]"/>
+          <field name="ultima_responsavel_id" string="Responsável"/>
+          <filter name="sem_resposta" string="Sem Resposta" domain="[('ultima_resposta_estado', '=', False)]"/>
+          <filter name="aberto" string="Aberto" domain="[('ultima_resposta_estado', '=', 'aberto')]"/>
+          <filter name="pendente" string="Pendente" domain="[('ultima_resposta_estado', '=', 'pendente')]"/>
+          <filter name="fechado" string="Fechado" domain="[('ultima_resposta_estado', '=', 'fechado')]"/>
+          <separator/>
+          <filter name="gravidade_baixa" string="Gravidade Baixa" domain="[('ultima_gravidade', '=', 'baixa')]"/>
+          <filter name="gravidade_media" string="Gravidade Média" domain="[('ultima_gravidade', '=', 'media')]"/>
+          <filter name="gravidade_alta" string="Gravidade Alta" domain="[('ultima_gravidade', '=', 'alta')]"/>
+          <filter name="gravidade_critica" string="Gravidade Crítica" domain="[('ultima_gravidade', '=', 'critica')]"/>
+          <separator/>
+          <filter name="categoria_qualidade" string="Categoria Qualidade" domain="[('ultima_categoria', '=', 'qualidade')]"/>
+          <filter name="categoria_seguranca" string="Categoria Segurança" domain="[('ultima_categoria', '=', 'seguranca')]"/>
+          <filter name="categoria_servico" string="Categoria Serviço (Transporte)" domain="[('ultima_categoria', '=', 'servico')]"/>
+          <separator/>
+          <filter name="as_minhas" string="As minhas (responsável)" domain="[('ultima_responsavel_id', '=', uid)]"/>
+          <separator/>
+          <filter name="data_criacao" string="Data de criação" date="create_date"/>
+          <filter name="data_conclusao" string="Data de conclusão" date="ultima_data_conclusao"/>
+          <filter name="data_fecho" string="Data de fecho" date="ultima_data_fecho"/>
+          <group expand="0" string="Agrupar por">
+            <filter name="agrupar_estado" string="Estado" context="{'group_by': 'ultima_resposta_estado'}"/>
+            <filter name="agrupar_gravidade" string="Gravidade" context="{'group_by': 'ultima_gravidade'}"/>
+            <filter name="agrupar_categoria" string="Categoria" context="{'group_by': 'ultima_categoria'}"/>
+            <filter name="agrupar_responsavel" string="Responsável" context="{'group_by': 'ultima_responsavel_id'}"/>
+            <filter name="agrupar_armazem" string="Armazém" context="{'group_by': 'armazem'}"/>
+            <filter name="agrupar_mes" string="Mês" context="{'group_by': 'create_date:month'}"/>
+            <filter name="agrupar_trimestre" string="Trimestre" context="{'group_by': 'create_date:quarter'}"/>
+            <filter name="agrupar_ano" string="Ano" context="{'group_by': 'create_date:year'}"/>
+          </group>
         </search>
       </field>
     </record>
