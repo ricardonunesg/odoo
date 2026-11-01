@@ -3,6 +3,17 @@
 Cópias dos documentos oficiais em `/srv/partilhada/Modulos ODOO_Relatórios/` (3.Formularios.docx,
 10. Qualidade_Reclamacoes.docx, 0.Indice_Modulos.docx), guardadas aqui para histórico.
 
+## 01/11/2026 — Ponto 5: artigos no Dashboard (qualidade_reclamacoes 18.0.1.5.0)
+
+- O painel passa a mostrar todos os artigos das linhas de cada reclamação (antes: campo antigo do cabeçalho, 25 de 61
+  sem artigo). Uma linha por reclamação: totais e indicadores iguais. Pesquisa "Artigo" por código ou descrição.
+- Sem submenu "Por Artigo" nem ecrãs, campos ou tabelas novos (decisão do Gonçalo).
+- Ensaio isolado e produção (01/11 19:23, commit 24555a2): só a Qualidade, 0 erros, 61/61 com todos os artigos
+  (0 sem artigo), indicadores iguais (Total 61, 78,7 %), históricos idênticos, P5 11/11, P11 47/47, P1 25/25.
+- O teste antigo das internas (31/10) tem 7 verificações com referências desactualizadas pelo Ponto 6 (assunto sem
+  número, referência "Interna #"); o comportamento real está coberto pelos testes do Ponto 6.
+- Reversão: /home/odoo/backups/REVERSAO_p5_artigos.md
+
 ## 01/11/2026 — Ponto 11: filtros, pesquisa e agrupamentos na Qualidade (qualidade_reclamacoes 18.0.1.4.0)
 
 - 3 listas (Clientes, Fornecedores, Internas): filtros por estado, gravidade, categoria, "as minhas", datas de criação,
