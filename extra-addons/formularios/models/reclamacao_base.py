@@ -114,9 +114,16 @@ class ReclamacaoBase(models.AbstractModel):
     def _proximo_numero(self, codigo, data):
         """Próximo número da série 'codigo' para o ano de 'data'. Série sem saltos: o contador só avança
         se a transacção for gravada, e duas gravações simultâneas esperam uma pela outra."""
-        numero = self.env['ir.sequence'].sudo().next_by_code(codigo, sequence_date=data)
-        if not numero:
+        seq = self.env['ir.sequence'].sudo().search([('code', '=', codigo)], limit=1)
+        if not seq:
             raise UserError("Falta a numeração '%s'. Contacte o administrador do Odoo." % codigo)
+        # As faixas anuais já estão criadas até 2035 (migração 18.0.1.4.0); só depois disso o Odoo as cria
+        # ao gravar, e duas gravações simultâneas na 1.ª reclamação de um ano podem colidir: mensagem clara.
+        try:
+            with self.env.cr.savepoint():
+                numero = seq.next_by_id(sequence_date=data)
+        except ValidationError:
+            raise UserError("Outra reclamação foi gravada ao mesmo tempo. Grave novamente, por favor.")
         return numero
 
     def _nome_com_numero(self):
