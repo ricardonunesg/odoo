@@ -4368,16 +4368,19 @@ class PrimaveraConnection(models.Model):
         n_gr = sum(1 for r in rows if r["TipoDoc"] == "GR")
         n_grt = sum(1 for r in rows if r["TipoDoc"] == "GRT")
         total = sum(float(r["TotalMerc"] or 0) for r in rows)
+        # Campos de texto vindos do Primavera são escapados (ex.: "&", "<"
+        # em nomes de clientes) para não partir a tabela.
+        esc = lambda v: html.escape(str(v or ""), quote=True)  # noqa: E731
         linhas = "".join(
             f"<tr>"
-            f"<td>{r['TipoDoc']}</td>"
-            f"<td>{r['Serie']}/{r['NumDoc']}</td>"
+            f"<td>{esc(r['TipoDoc'])}</td>"
+            f"<td>{esc(r['Serie'])}/{esc(r['NumDoc'])}</td>"
             f"<td>{r['Data'].strftime('%Y-%m-%d')}</td>"
-            f"<td style='text-align:right'>{r['DiasAberto']}</td>"
-            f"<td>{r['Entidade']}</td>"
-            f"<td>{(r['Nome'] or '')[:50]}</td>"
+            f"<td style='text-align:right'>{esc(r['DiasAberto'])}</td>"
+            f"<td>{esc(r['Entidade'])}</td>"
+            f"<td>{esc((r['Nome'] or '')[:50])}</td>"
             f"<td style='text-align:right'>{float(r['TotalMerc'] or 0):,.2f}</td>"
-            f"<td>{r['Utilizador'] or ''}</td>"
+            f"<td>{esc(r['Utilizador'])}</td>"
             f"</tr>"
             for r in rows
         )
@@ -4436,9 +4439,11 @@ class PrimaveraConnection(models.Model):
                 "description": html,
                 "user_ids": [(6, 0, assignees.ids)],
             })
+            # Markup: sem isto o Odoo 18 escapa o corpo e a mensagem aparece
+            # com as tags HTML em texto (visto a 31/08 e 31/10/2026).
             existente.message_post(
-                body=(f"<p><b>Atualização {hoje}</b>: {len(rows)} GR/GRT "
-                      f"ainda por faturar.</p>{html}"),
+                body=Markup(f"<p><b>Atualização {hoje}</b>: {len(rows)} GR/GRT "
+                            f"ainda por faturar.</p>{html}"),
                 subject=titulo,
             )
             self._log("alerta_gr_grt", "success",
