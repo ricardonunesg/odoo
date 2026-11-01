@@ -13,7 +13,9 @@
             </div>
 
             <group>
-              <field name="reclamacao_id"/>
+              <!-- a resposta fica sempre na reclamação do Responder: só de leitura, sem abrir nem escolher outra -->
+              <field name="reclamacao_id" readonly="1" force_save="1" options="{'no_open': True, 'no_create': True}"/>
+              <field name="pdf_reclamacao_url" widget="url" text="Imprimir PDF da reclamação" readonly="1" invisible="not reclamacao_id"/>
               <field name="estado_resposta"/>
               <field name="data"/>
             </group>
