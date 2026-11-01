@@ -7,7 +7,8 @@
         <search string="Dashboard Reclamações">
           <field name="reclamacao_ref"/>
           <field name="entidade"/>
-          <field name="codigo_artigo"/>
+          <!-- artigo: código ou descrição de qualquer linha da reclamação -->
+          <field name="codigo_artigo" string="Artigo" filter_domain="['|', ('codigo_artigo', 'ilike', self), ('descricao_artigo', 'ilike', self)]"/>
           <field name="tipo"/>
           <field name="estado_resposta"/>
           <field name="categoria"/>

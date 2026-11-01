@@ -3,7 +3,7 @@ from odoo import fields, models, tools
 from .constantes import ARMAZENS, ESTADOS_RESPOSTA, CATEGORIAS, ORIGENS, GRAVIDADES
 
 # Um bloco SELECT por origem (clientes / fornecedores). O SQL é igual nos dois:
-# só mudam a tabela, o alias, o id, o tipo, a entidade e a referência (número da reclamação).
+# só mudam as tabelas, o alias, o id, o tipo, a entidade e a referência (número da reclamação).
 _SQL_BLOCO = """
                 SELECT
                     {id_expr} AS id,
@@ -11,8 +11,11 @@ _SQL_BLOCO = """
                     {a}.{entidade} AS entidade,
                     {a}.user_id AS utilizador_id,
                     {a}.armazem AS armazem,
-                    {a}.codigo_artigo AS codigo_artigo,
-                    {a}.descricao_artigo AS descricao_artigo,
+                    -- todos os artigos das linhas (uma linha por reclamação); sem linhas, o campo antigo do cabeçalho
+                    COALESCE((SELECT string_agg(l.codigo_artigo, ', ' ORDER BY l.sequence, l.id)
+                              FROM {tabela_linha} l WHERE l.form_id = {a}.id), {a}.codigo_artigo) AS codigo_artigo,
+                    COALESCE((SELECT string_agg(l.descricao_artigo, ', ' ORDER BY l.sequence, l.id)
+                              FROM {tabela_linha} l WHERE l.form_id = {a}.id), {a}.descricao_artigo) AS descricao_artigo,
                     {a}.create_date AS data_criacao,
                     COALESCE(resposta.estado_resposta, 'sem_resposta') AS estado_resposta,
                     resposta.categoria AS categoria,
@@ -69,6 +72,7 @@ _BLOCOS = [
     dict(  # ids ímpares: clientes
         a='cliente', r='resposta_cliente', entidade='cliente',
         tabela='form_reclama_cliente', tabela_resposta='qualidade_resposta_cliente',
+        tabela_linha='form_reclama_cliente_linha',
         id_expr='(cliente.id * 2 - 1)',
         tipo_expr="'cliente'",
         ref_expr="COALESCE(cliente.name, 'Cliente #' || cliente.id::varchar)",
@@ -76,6 +80,7 @@ _BLOCOS = [
     dict(  # ids pares: fornecedores (externas e internas)
         a='fornecedor', r='resposta_fornecedor', entidade='fornecedor',
         tabela='form_reclama_fornecedor', tabela_resposta='qualidade_resposta_fornecedor',
+        tabela_linha='form_reclama_fornecedor_linha',
         id_expr='(fornecedor.id * 2)',
         tipo_expr="(CASE WHEN fornecedor.tipo_reclamacao = 'interna' THEN 'interna' ELSE 'fornecedor' END)",
         ref_expr="COALESCE(fornecedor.name, (CASE WHEN fornecedor.tipo_reclamacao = 'interna' THEN 'Interna #' ELSE 'Fornecedor #' END) || fornecedor.id::varchar)",
