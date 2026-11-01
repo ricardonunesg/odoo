@@ -3,6 +3,18 @@
 Cópias dos documentos oficiais em `/srv/partilhada/Modulos ODOO_Relatórios/` (3.Formularios.docx,
 10. Qualidade_Reclamacoes.docx, 0.Indice_Modulos.docx), guardadas aqui para histórico.
 
+## 01/11/2026 — Ponto 11: filtros, pesquisa e agrupamentos na Qualidade (qualidade_reclamacoes 18.0.1.4.0)
+
+- 3 listas (Clientes, Fornecedores, Internas): filtros por estado, gravidade, categoria, "as minhas", datas de criação,
+  conclusão e fecho; pesquisa por número, entidade, responsável, artigo e lote (todas as linhas); agrupar por estado,
+  gravidade, categoria, responsável, armazém, mês/trimestre/ano. Sem menus nem fichas novas; Responder igual.
+- 8 valores da última resposta guardados (actualizam-se ao criar/alterar/eliminar respostas); preenchidos por SQL na
+  migração para não mudar o Criado/Modificado por/em dos históricos. Daqui para a frente o Modificado por/em da
+  reclamação mostra também o engenheiro que mexeu nas respostas (utilizador real, confirmado com logins reais).
+- Ensaio: 47/47, históricos idênticos, simultaneidade, reversão. Produção (01/11 19:00, commit 7bc6697): só a Qualidade
+  actualizada, 0 erros, históricos idênticos, 61/61 valores = respostas, 47/47, P1 25/25, captura igual (salvo ids).
+- Reversão: /home/odoo/backups/REVERSAO_p11_filtros.md
+
 ## 01/11/2026 — Ponto 6: numeração RCL / RFO / RIN (formularios 18.0.1.4.0, qualidade_reclamacoes 18.0.1.3.0)
 
 - Número automático e anual, sem saltos nem repetidos: RCL (clientes), RFO (fornecedores), RIN (internas); faixas 2026-2035.
