@@ -15,6 +15,11 @@
               <!-- a resposta fica sempre na reclamação do Responder: só de leitura, sem abrir nem escolher outra -->
               <field name="reclamacao_id" readonly="1" force_save="1" options="{'no_open': True, 'no_create': True}"/>
               <field name="pdf_reclamacao_url" widget="url" text="Imprimir PDF da reclamação" readonly="1" invisible="not reclamacao_id"/>
+              <!-- Rastreabilidade do lote reclamado: lida do Primavera (só leitura) só quando se liga; não grava a resposta -->
+              <field name="rastreio_consultar" string="Rastreabilidade" widget="boolean_toggle" options="{'autosave': false}"/>
+              <field name="rastreio_linha_id" invisible="not rastreio_consultar" domain="[('form_id', '=', reclamacao_id)]"
+                     options="{'no_create': True, 'no_open': True}"/>
+              <field name="rastreio_html" nolabel="1" colspan="2" readonly="1" invisible="not rastreio_consultar"/>
               <field name="estado_resposta"/>
               <field name="data"/>
             </group>
@@ -57,17 +62,6 @@
               <field name="anexos_ids" widget="qualidade_anexos_preview"/>
             </group>
 
-            <!-- Rastreabilidade do lote reclamado: lida do Primavera (só leitura) só quando se liga "Consultar" -->
-            <notebook>
-              <page string="Rastreabilidade" name="rastreabilidade">
-                <group>
-                  <field name="rastreio_linha_id" domain="[('form_id', '=', reclamacao_id)]"
-                         options="{'no_create': True, 'no_open': True}"/>
-                  <field name="rastreio_consultar" widget="boolean_toggle" options="{'autosave': false}"/>
-                </group>
-                <field name="rastreio_html" nolabel="1" readonly="1" invisible="not rastreio_consultar"/>
-              </page>
-            </notebook>
           </sheet>
         </form>
       </field>
