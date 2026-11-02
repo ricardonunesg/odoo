@@ -3,6 +3,19 @@
 Cópias dos documentos oficiais em `/srv/partilhada/Modulos ODOO_Relatórios/` (3.Formularios.docx,
 10. Qualidade_Reclamacoes.docx, 0.Indice_Modulos.docx), guardadas aqui para histórico.
 
+## 02/11/2026 — Fase 2, Ponto 4: rastreabilidade de clientes (formularios 18.0.1.5.0, qualidade_reclamacoes 18.0.1.9.0)
+
+- Separador "Rastreabilidade" no Responder (clientes): COM do lote (data da COM), consumos reais só do produto
+  reclamado (IdLinhaComposto), origem dos materiais até 2 níveis (fatura/guia do fornecedor: confirmada por
+  LinhasComprasTrans, senão "provável"), clientes por FA/FAT/FRT, devoluções à parte; avisos de lote genérico,
+  mistura, sem entrada, lote não encontrado, guias sem fatura e destino potencialmente incompleto (lotações
+  intermédias). Página "outros produtos acabados" por lote de material. Consulta só a pedido; nada gravado.
+- Formulários: botão de lotes faturados ao cliente no campo Lote (escrita manual mantida).
+- Primavera só leitura: formularios.primavera.leitura recusa tudo o que não seja SELECT; 5 s por consulta.
+- Produção (02/11 21:27, commit 26fad0b): só Formulários + Qualidade, 0 erros, verificação 25/25 + 9/9 + 2/2,
+  dados iguais antes/depois, nenhuma resposta gravada.
+- Reversão: /home/odoo/backups/REVERSAO_f2p4_rastreabilidade.md
+
 ## 02/11/2026 — Fase 2, Ponto 3: artigos e colunas nas listas (qualidade_reclamacoes 18.0.1.8.0)
 
 - Listas Clientes / Fornecedores / Internas: Código Artigo, Descrição Artigo e Lote vêm das linhas de artigos (um por
