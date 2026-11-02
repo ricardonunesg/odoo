@@ -12,6 +12,13 @@ class QualidadeUltimaRespostaMixin(models.AbstractModel):
 
     _modelo_resposta = None
     _titulo_responder = None
+    _campo_lote = None  # nome do campo do lote nas linhas e no cabeçalho (cliente: lote; fornecedor: lote_guia_fatura)
+
+    # Artigos das linhas para as listas da Qualidade: um por linha na mesma célula (Text → o Odoo mostra as quebras),
+    # pela ordem das linhas, alinhados entre as 3 colunas. Sem linhas: campos antigos do cabeçalho. Não guardados.
+    artigos_codigo = fields.Text(string='Código Artigo', compute='_compute_artigos_lista')
+    artigos_descricao = fields.Text(string='Descrição Artigo', compute='_compute_artigos_lista')
+    artigos_lote = fields.Text(string='Lote / Guia / Fatura', compute='_compute_artigos_lista')
 
     # Guardados (para filtrar e agrupar nas listas da Qualidade); recalculados sempre que uma resposta
     # é criada, alterada (incluindo a data) ou eliminada. Sem respostas ficam vazios ("Sem resposta").
@@ -76,6 +83,25 @@ class QualidadeUltimaRespostaMixin(models.AbstractModel):
             rec.ultima_verificacao_eficacia = ultima.verificacao_eficacia if ultima else False
             rec.ultima_observacoes = ultima.observacoes if ultima else False
 
+    def _depends_artigos_lista(self):
+        if not self._campo_lote:  # a própria base comum (sem linhas)
+            return []
+        return ['linha_ids', 'linha_ids.sequence', 'linha_ids.codigo_artigo', 'linha_ids.descricao_artigo',
+                'linha_ids.' + self._campo_lote, 'codigo_artigo', 'descricao_artigo', self._campo_lote]
+
+    @api.depends(lambda self: self._depends_artigos_lista())
+    def _compute_artigos_lista(self):
+        for rec in self:
+            linhas = [(l.codigo_artigo, l.descricao_artigo, l[rec._campo_lote]) for l in rec.linha_ids] \
+                or [(rec.codigo_artigo, rec.descricao_artigo, rec[rec._campo_lote])]
+            if not any(any(linha) for linha in linhas):
+                rec.artigos_codigo = rec.artigos_descricao = rec.artigos_lote = False
+                continue
+            # "—" num valor vazio mantém o alinhamento das 3 colunas
+            rec.artigos_codigo = '\n'.join(c or '—' for c, d, lt in linhas)
+            rec.artigos_descricao = '\n'.join(d or '—' for c, d, lt in linhas)
+            rec.artigos_lote = '\n'.join(lt or '—' for c, d, lt in linhas)
+
     def _abrir_resposta(self):
         self.ensure_one()
         resposta = self.env[self._modelo_resposta].search(
@@ -108,6 +134,7 @@ class FormCliente(models.Model):
 
     _modelo_resposta = 'qualidade.resposta.cliente'
     _titulo_responder = 'Responder (Cliente)'
+    _campo_lote = 'lote'
 
     resposta_ids = fields.One2many('qualidade.resposta.cliente', 'reclamacao_id', string='Respostas (Qualidade)')
 
@@ -121,6 +148,7 @@ class FormFornecedor(models.Model):
 
     _modelo_resposta = 'qualidade.resposta.fornecedor'
     _titulo_responder = 'Responder (Fornecedor)'
+    _campo_lote = 'lote_guia_fatura'
 
     resposta_ids = fields.One2many('qualidade.resposta.fornecedor', 'reclamacao_id', string='Respostas (Qualidade)')
 

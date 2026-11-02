@@ -82,19 +82,19 @@
           <field name="numeros_anteriores" optional="hide"/>
           <field name="create_date" string="Criado em" optional="show"/>
           <field name="fornecedor" optional="show"/>
-          <field name="codigo_artigo" optional="show"/>
-          <field name="descricao_artigo" optional="hide"/>
-          <field name="lote_guia_fatura" optional="show"/>
+          <field name="artigos_codigo" optional="show"/>
+          <field name="artigos_descricao" optional="show"/>
+          <field name="artigos_lote" optional="show"/>
           <field name="ultima_resposta_estado" string="Estado" widget="badge" optional="show"
                  decoration-danger="ultima_resposta_estado == 'aberto'"
                  decoration-warning="ultima_resposta_estado == 'pendente'"
                  decoration-success="ultima_resposta_estado == 'fechado'"/>
-          <field name="ultima_categoria" optional="show"/>
+          <field name="ultima_categoria" optional="hide"/>
           <field name="ultima_origem" optional="show"/>
-          <field name="ultima_gravidade" optional="show"/>
-          <field name="ultima_responsavel_id" optional="show"/>
-          <field name="ultima_aprovado_por_id" optional="show"/>
-          <field name="ultima_data_conclusao" optional="show"/>
+          <field name="ultima_gravidade" optional="hide"/>
+          <field name="ultima_responsavel_id" optional="hide"/>
+          <field name="ultima_aprovado_por_id" optional="hide"/>
+          <field name="ultima_data_conclusao" optional="hide"/>
           <field name="ultima_causa" optional="hide"/>
           <field name="ultima_acoes_corretivas" optional="hide"/>
           <field name="ultima_verificacao_eficacia" optional="hide"/>
