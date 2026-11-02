@@ -117,7 +117,8 @@
             <td><t t-esc="p['artigo']"/><br/><span class="muted" t-esc="p['descricao']"/></td>
             <td t-esc="p['lote']"/><td t-esc="p['com']"/><td t-esc="fmt(p['data'])"/><td t-esc="fmt(p['consumo'])"/>
             <td>
-              <t t-if="not p['clientes']"><span class="muted">sem faturas</span></t>
+              <div t-if="p['intermedio']" class="aviso">Lotação intermédia — rastreabilidade de destino potencialmente incompleta</div>
+              <t t-if="not p['clientes'] and not p['intermedio']"><span class="muted">sem faturas</span></t>
               <div t-foreach="p['clientes']" t-as="c"><t t-esc="c['cliente']"/> · <t t-esc="fmt(c['quantidade'])"/> (<t t-esc="c['documentos']"/> doc.)</div>
             </td>
           </tr>

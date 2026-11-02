@@ -45,7 +45,9 @@ SQL_CONSUMOS = """
     ORDER BY s.Artigo, s.Lote"""
 
 SQL_COMPRAS = """
-    SELECT TOP %d c.TipoDoc, c.Serie, c.NumDoc, c.Entidade, c.Nome, ISNULL(l.DataEntrada, c.DataDoc), ABS(l.Quantidade)
+    SELECT TOP %d c.TipoDoc, c.Serie, c.NumDoc, c.Entidade, c.Nome, ISNULL(l.DataEntrada, c.DataDoc), ABS(l.Quantidade),
+           CAST(l.Id AS varchar(40)),
+           (SELECT TOP 1 CAST(t.IdLinhasComprasOrigem AS varchar(40)) FROM LinhasComprasTrans t WHERE t.IdLinhasCompras = l.Id)
     FROM LinhasCompras l
     JOIN CabecCompras c ON c.Id = l.IdCabecCompras
     JOIN DocumentosCompra d ON d.Documento = c.TipoDoc
@@ -97,6 +99,15 @@ SQL_OUTROS_PA = """
     GROUP BY e.Artigo, e.Lote, c.Serie, c.NumDoc
     ORDER BY MAX(c.Data), c.NumDoc""" % (LIMITE + 1)
 
+# lotes produzidos com este material que voltam a ser consumidos noutras COM (lotações intermédias)
+SQL_INTERMEDIOS = """
+    SELECT DISTINCT x.Artigo, x.Lote
+    FROM INV_LinhasComposicoes x
+    WHERE x.EntradaSaida = 'S' AND EXISTS (
+        SELECT 1 FROM INV_LinhasComposicoes s
+        JOIN INV_LinhasComposicoes e ON e.Id = s.IdLinhaComposto
+        WHERE s.EntradaSaida = 'S' AND s.Artigo = %s AND s.Lote = %s AND e.Artigo = x.Artigo AND e.Lote = x.Lote)"""
+
 SQL_CLIENTES_OUTROS_PA = """
     SELECT l.Artigo, l.Lote, c.Entidade, MAX(c.Nome), SUM(l.Quantidade), COUNT(DISTINCT c.Id)
     FROM LinhasDoc l
@@ -136,19 +147,24 @@ class QualidadeRastreabilidade(models.AbstractModel):
 
     @staticmethod
     def _sem_faturas_de_guias(compras):
-        """No Primavera a V/Fatura não fica ligada à V/Guia do mesmo fornecimento (e ambas movem stock).
-        Uma VFA/VFAT do mesmo fornecedor, lote e quantidade de uma VGR/VGRT (até 60 dias de diferença, antes ou
-        depois) é tratada como a fatura desse fornecimento: não conta como outra entrada (evita falsas misturas)."""
-        linhas = [[t, s, n, e, nome, d, q, None] for t, s, n, e, nome, d, q in compras]
+        """A V/Fatura (VFA/VFAT) e a V/Guia (VGR/VGRT) do mesmo fornecimento movem ambas stock: a fatura não conta
+        como outra entrada. Correspondência CONFIRMADA quando o Primavera liga a linha da fatura à da guia
+        (LinhasComprasTrans); sem essa ligação, mesmo fornecedor e quantidade até 60 dias = PROVÁVEL (assinalada)."""
+        linhas = [[t, s, n, e, nome, d, q, None, lid, origem] for t, s, n, e, nome, d, q, lid, origem in compras]
         guias = [g for g in linhas if g[0] in ('VGR', 'VGRT')]
+        por_id = {g[8]: g for g in guias}
         resultado = []
         for linha in linhas:
-            t, s, n, e, _nome, d, q, _fat = linha
+            t, s, n, e, _nome, d, q, _fat, _lid, origem = linha
             if t in ('VFA', 'VFAT'):
+                guia = por_id.get(origem)
+                if guia and not guia[7]:
+                    guia[7] = 'fatura %s %s/%s' % (t, s, n)
+                    continue
                 guia = next((g for g in guias if not g[7] and g[3] == e and abs((g[6] or 0) - (q or 0)) < 0.001
                              and d and g[5] and abs((d - g[5]).days) <= 60), None)
                 if guia:
-                    guia[7] = '%s %s/%s' % (t, s, n)
+                    guia[7] = 'fatura provável %s %s/%s' % (t, s, n)
                     continue
             resultado.append(linha)
         return resultado
@@ -178,9 +194,9 @@ class QualidadeRastreabilidade(models.AbstractModel):
         compras = self._sem_faturas_de_guias(ler.q(SQL_COMPRAS, artigo, lote))
         if compras:
             return {'tipo': 'compra', 'mistura': len(compras) > 1, 'excesso': len(compras) > LIMITE_ENTRADAS,
-                    'entradas': [{'documento': '%s %s/%s' % (t, s, n) + (' (+ fatura %s)' % fat if fat else ''),
+                    'entradas': [{'documento': '%s %s/%s' % (t, s, n) + (' (+ %s)' % fat if fat else ''),
                                   'fornecedor': '%s %s' % (e or '', nome or ''), 'data': d, 'quantidade': q}
-                                 for t, s, n, e, nome, d, q, fat in compras[:LIMITE_ENTRADAS]]}
+                                 for t, s, n, e, nome, d, q, fat, _lid, _origem in compras[:LIMITE_ENTRADAS]]}
         lotacoes = self._producoes(ler, artigo, lote, apagadas)
         if lotacoes:
             origem = {'tipo': 'lotacao', 'producoes': lotacoes, 'componentes': [], 'limite': False}
@@ -265,10 +281,15 @@ class QualidadeRastreabilidade(models.AbstractModel):
                       if not self._apagada(apagadas, x[3], x[4])]
             if len(linhas) > LIMITE:
                 r['avisos'].append("Mais de %d produções: só as primeiras são apresentadas." % LIMITE)
+            intermedios = set(ler.q(SQL_INTERMEDIOS, artigo, lote))
+            if intermedios:
+                r['avisos'].append("Rastreabilidade de destino potencialmente incompleta: %d lote(s) produzido(s) com este "
+                                   "material (lotações intermédias) foram depois consumidos noutras produções, que não são "
+                                   "seguidas até aos produtos acabados." % len(intermedios))
             clientes = {}
             for a, l, e, nome, q, ndocs in ler.q(SQL_CLIENTES_OUTROS_PA, artigo, lote):
                 clientes.setdefault((a, l), []).append({'cliente': '%s %s' % (e, nome or ''), 'quantidade': q, 'documentos': ndocs})
             r['produtos'] = [{'artigo': a, 'descricao': d or '', 'lote': l, 'com': 'COM %s/%s' % (s, n), 'data': data,
-                              'consumo': q, 'clientes': clientes.get((a, l), [])}
+                              'consumo': q, 'clientes': clientes.get((a, l), []), 'intermedio': (a, l) in intermedios}
                              for a, d, l, s, n, data, q in linhas[:LIMITE]]
         return r
