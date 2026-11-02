@@ -1,0 +1,64 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* mirazeite_activity_reminder
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 18.0\n"
+"Report-Msgid-Bugs-To: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: mirazeite_activity_reminder
+#. odoo-python
+#: code:addons/mirazeite_activity_reminder/models/mail_activity.py:0
+msgid "Activity"
+msgstr "Atividade"
+
+#. module: mirazeite_activity_reminder
+#. odoo-python
+#: code:addons/mirazeite_activity_reminder/models/mail_activity.py:0
+msgid "Activity:"
+msgstr "Atividade:"
+
+#. module: mirazeite_activity_reminder
+#. odoo-python
+#: code:addons/mirazeite_activity_reminder/models/mail_activity.py:0
+msgid "Summary:"
+msgstr "Resumo:"
+
+#. module: mirazeite_activity_reminder
+#. odoo-python
+#: code:addons/mirazeite_activity_reminder/models/mail_activity.py:0
+msgid "Document:"
+msgstr "Documento:"
+
+#. module: mirazeite_activity_reminder
+#. odoo-python
+#: code:addons/mirazeite_activity_reminder/models/mail_activity.py:0
+msgid "This activity is due today:"
+msgstr "Esta atividade tem prazo para hoje:"
+
+#. module: mirazeite_activity_reminder
+#. odoo-python
+#: code:addons/mirazeite_activity_reminder/models/mail_activity.py:0
+#, python-format
+msgid "\"%(activity_name)s: %(summary)s\" is due today"
+msgstr "\"%(activity_name)s: %(summary)s\" — prazo hoje"
+
+#. module: mirazeite_activity_reminder
+#. odoo-python
+#: code:addons/mirazeite_activity_reminder/models/mail_activity.py:0
+#, python-format
+msgid "Activity: %s"
+msgstr "Atividade: %s"
+
+#. module: mirazeite_activity_reminder
+#. odoo-python
+#: code:addons/mirazeite_activity_reminder/models/mail_activity.py:0
+msgid "Deadline: today"
+msgstr "Prazo: hoje"
