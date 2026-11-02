@@ -1,7 +1,7 @@
 {
     'web_icon': 'formularios/static/description/icon.png',
     'name': 'Formulários',
-    'version': '1.5.1',
+    'version': '1.5.2',
     'summary': 'Formulários de reclamações (Cliente e Fornecedor)',
     'category': 'Operations',
     'author': 'A tua empresa',

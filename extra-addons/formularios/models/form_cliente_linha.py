@@ -26,9 +26,14 @@ class FormReclamacaoClienteLinha(models.Model):
 
     @api.depends('descricao_artigo', 'codigo_artigo', 'lote')
     def _compute_display_name(self):
-        # descrição do artigo (Primavera) — lote; o código continua a ser o que se usa nas consultas
+        # descrição actual do artigo no Primavera (artigos sincronizados no Odoo) — lote; sem artigo com esse código,
+        # a descrição gravada na linha. O código continua a ser o que se usa nas consultas.
+        codigos = [c.strip() for c in self.mapped('codigo_artigo') if c]
+        nomes = {p.primavera_code: p.name for p in self.env['product.template'].sudo().with_context(active_test=False).search(
+            [('primavera_code', 'in', codigos)])} if codigos else {}
         for rec in self:
-            rec.display_name = ' — '.join(x for x in (rec.descricao_artigo or rec.codigo_artigo, rec.lote) if x) or _('Linha de artigo')
+            descricao = nomes.get((rec.codigo_artigo or '').strip()) or rec.descricao_artigo or rec.codigo_artigo
+            rec.display_name = ' — '.join(x for x in (descricao, rec.lote) if x) or _('Linha de artigo')
 
     @api.model
     def lotes_vendidos_primavera(self, codigo_artigo, partner_id):
