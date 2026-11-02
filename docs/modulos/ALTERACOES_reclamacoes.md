@@ -3,6 +3,17 @@
 Cópias dos documentos oficiais em `/srv/partilhada/Modulos ODOO_Relatórios/` (3.Formularios.docx,
 10. Qualidade_Reclamacoes.docx, 0.Indice_Modulos.docx), guardadas aqui para histórico.
 
+## 02/11/2026 — Fase 2, Ponto 3: artigos e colunas nas listas (qualidade_reclamacoes 18.0.1.8.0)
+
+- Listas Clientes / Fornecedores / Internas: Código Artigo, Descrição Artigo e Lote vêm das linhas de artigos (um por
+  linha na mesma célula, alinhados; sem linhas, campos antigos). Campos calculados, nada gravado na BD.
+- Visíveis por defeito: Número, Criado em, Cliente/Fornecedor, Código, Descrição, Lote, Estado, Origem, Responder;
+  restantes opcionais (⋮). Filtros, pesquisas e agrupamentos inalterados. Preferências: Favoritos (servidor) e
+  colunas (browser), nativos do Odoo.
+- Produção (02/11 11:17, commit 78f6bb9): só a Qualidade, 0 erros na actualização, 61/61 reclamações certas
+  (4 com vários artigos), 13/13 + browser 6/6; mudam só as 2 listas, 9 campos novos e a versão.
+- Reversão: /home/odoo/backups/REVERSAO_f2p3_listas.md
+
 ## 01/11/2026 — Fase 2, Ponto 2: pré-visualização de anexos (qualidade_reclamacoes 18.0.1.7.0)
 
 - Ficha do Responder: anexos do formulário e evidências da Qualidade abrem no visualizador nativo do Odoo
