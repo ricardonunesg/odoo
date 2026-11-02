@@ -3,6 +3,13 @@
 Cópias dos documentos oficiais em `/srv/partilhada/Modulos ODOO_Relatórios/` (3.Formularios.docx,
 10. Qualidade_Reclamacoes.docx, 0.Indice_Modulos.docx), guardadas aqui para histórico.
 
+## 02/11/2026 — Fase 2, Ponto 4b: Rastreabilidade no topo do Responder (qualidade_reclamacoes 18.0.1.9.1)
+
+- Interruptor "Rastreabilidade" logo abaixo de "Imprimir PDF da reclamação": liga = mostra por baixo, desliga =
+  recolhe; separador antigo no fundo retirado. Só vista XML; consultas ao Primavera iguais; não grava respostas.
+- Produção (02/11 22:15, commit 4f8ed5a): só a Qualidade, 0 erros, verificação 9/9, dados iguais.
+- Reversão: repor a vista da versão 26fad0b (backups *pre-f2p4b*) e -u qualidade_reclamacoes.
+
 ## 02/11/2026 — Fase 2, Ponto 4: rastreabilidade de clientes (formularios 18.0.1.5.0, qualidade_reclamacoes 18.0.1.9.0)
 
 - Separador "Rastreabilidade" no Responder (clientes): COM do lote (data da COM), consumos reais só do produto
