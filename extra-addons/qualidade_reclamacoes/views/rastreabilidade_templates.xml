@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+  <template id="rastreio_erro">
+    <div class="alert alert-warning mb-0" role="alert"><i class="fa fa-exclamation-triangle me-1"/><t t-esc="mensagem"/></div>
+  </template>
+
+  <!-- Origem de um lote de material: compras, lotação interna (até 2 níveis) ou entrada interna -->
+  <template id="rastreio_origem">
+    <t t-if="o['tipo'] == 'compra'">
+      <div t-if="o['mistura']" class="text-warning small mb-1"><i class="fa fa-exclamation-triangle me-1"/><t t-if="(artigo_origem or '').startswith('MP.')">Depósito / mistura: </t><t t-esc="len(o['entradas'])"/><t t-if="o['excesso']">+</t> entradas deste lote</div>
+      <table class="table table-sm table-borderless small mb-1">
+        <tr class="text-muted"><td>Fornecedor</td><td>Documento de entrada</td><td>Data de receção</td><td class="text-end">Qtd</td></tr>
+        <tr t-foreach="o['entradas']" t-as="e">
+          <td t-esc="e['fornecedor']"/><td t-esc="e['documento']"/><td t-esc="fmt(e['data'])"/><td class="text-end" t-esc="fmt(e['quantidade'])"/>
+        </tr>
+      </table>
+    </t>
+    <t t-elif="o['tipo'] == 'lotacao'">
+      <div class="small mb-1">Lotação interna: <t t-foreach="o['producoes']" t-as="p"><t t-esc="p['com']"/> (<t t-esc="fmt(p['data'])"/>)<t t-if="not p_last">, </t></t></div>
+      <div t-if="o.get('mistura')" class="text-warning small mb-1"><i class="fa fa-exclamation-triangle me-1"/>Mistura de vários lotes de origem</div>
+      <div t-if="o['limite']" class="text-muted small mb-1"><i class="fa fa-info-circle me-1"/>Origem mais antiga não apresentada (limite de 2 níveis).</div>
+      <div t-foreach="o['componentes']" t-as="c" class="ms-3 ps-2 border-start mb-1">
+        <div class="small"><b t-esc="c['artigo']"/> <t t-esc="c['descricao']"/> · lote <b t-esc="c['lote'] or '—'"/> · <t t-esc="fmt(c['quantidade'])"/> <t t-esc="c['unidade']"/></div>
+        <div t-if="c['generico']" class="text-muted small">Lote genérico — rastreabilidade não disponível</div>
+        <t t-elif="c['origem']" t-call="qualidade_reclamacoes.rastreio_origem"><t t-set="o" t-value="c['origem']"/><t t-set="artigo_origem" t-value="c['artigo']"/></t>
+      </div>
+    </t>
+    <t t-elif="o['tipo'] == 'interna'">
+      <div class="small">Entrada interna (stock inicial / acerto de inventário):
+        <t t-foreach="o['entradas']" t-as="e"><t t-esc="e['documento']"/> de <t t-esc="fmt(e['data'])"/><t t-if="not e_last">; </t></t>
+      </div>
+    </t>
+    <t t-else="">
+      <div class="text-warning small"><i class="fa fa-exclamation-triangle me-1"/>Informação incompleta: não foi encontrada a entrada deste lote no Primavera.</div>
+    </t>
+  </template>
+
+  <template id="rastreio_resultado">
+    <div class="o_qualidade_rastreio">
+      <div t-foreach="r['avisos']" t-as="a" class="alert alert-warning py-1 px-2 mb-2 small"><i class="fa fa-exclamation-triangle me-1"/><t t-esc="a"/></div>
+
+      <h5 class="mt-1">1. Produção — <t t-esc="r['artigo']"/> · lote <t t-esc="r['lote']"/></h5>
+      <p t-if="not r['producoes']" class="text-muted">Sem COM encontrada.</p>
+      <table t-else="" class="table table-sm small">
+        <tr class="text-muted"><td>COM</td><td>Data da COM</td><td class="text-end">Quantidade produzida</td><td>Armazém</td></tr>
+        <tr t-foreach="r['producoes']" t-as="p"><td t-esc="p['com']"/><td t-esc="fmt(p['data'])"/><td class="text-end" t-esc="fmt(p['quantidade'])"/><td t-esc="p['armazem']"/></tr>
+      </table>
+      <p t-if="r['outros_na_com']" class="text-muted small"><i class="fa fa-info-circle me-1"/>A(s) COM produziu(ram) também <t t-esc="r['outros_na_com']"/> outro(s) lote(s), que não entram aqui: só se mostram os materiais deste produto.</p>
+
+      <h5 class="mt-3">2. Materiais consumidos neste produto (<t t-esc="len(r['materiais'])"/>)</h5>
+      <p class="text-muted small mb-1">Clique num material para ver o fornecedor, o documento e a data de receção.</p>
+      <details t-foreach="r['materiais']" t-as="m" class="border-bottom py-1">
+        <summary class="small">
+          <b t-esc="m['artigo']"/> <t t-esc="m['descricao']"/> · lote <b t-esc="m['lote'] or '—'"/> · <t t-esc="fmt(m['quantidade'])"/> <t t-esc="m['unidade']"/>
+          <span t-if="m['generico']" class="text-muted"> · Lote genérico — rastreabilidade não disponível</span>
+          <span t-elif="m['origem'] and m['origem'].get('mistura')" class="text-warning"> · <i class="fa fa-exclamation-triangle"/> <t t-if="m['artigo'].startswith('MP.')">mistura</t><t t-else="">várias entradas</t></span>
+          <span t-elif="m['origem'] and m['origem']['tipo'] == 'desconhecida'" class="text-warning"> · <i class="fa fa-exclamation-triangle"/> sem entrada</span>
+        </summary>
+        <div class="ms-3 my-1">
+          <t t-if="m['generico']"><div class="text-muted small">Este material usa um lote genérico (igual em todas as produções): não é possível saber de que fornecimento veio.</div></t>
+          <t t-else="">
+            <t t-call="qualidade_reclamacoes.rastreio_origem"><t t-set="o" t-value="m['origem']"/><t t-set="artigo_origem" t-value="m['artigo']"/></t>
+            <a t-att-href="url_material(m['artigo'], m['lote'])" target="_blank" rel="noopener" class="small"><i class="fa fa-external-link me-1"/>Ver outros produtos acabados com este lote</a>
+          </t>
+        </div>
+      </details>
+
+      <h5 class="mt-3">3. Clientes que receberam este lote (faturas FA / FAT / FRT)</h5>
+      <p t-if="not r['clientes']" class="text-muted">Nenhuma fatura com este lote.</p>
+      <t t-else="">
+        <p class="small mb-1"><t t-esc="r['clientes_distintos']"/> cliente(s) · <t t-esc="fmt(r['quantidade_faturada'])"/> unidades faturadas</p>
+        <table class="table table-sm small">
+          <tr class="text-muted"><td>Cliente</td><td>Entrega (se diferente)</td><td>Documento</td><td>Data</td><td class="text-end">Qtd</td></tr>
+          <tr t-foreach="r['clientes']" t-as="c"><td t-esc="c['cliente']"/><td t-esc="c['entrega']"/><td t-esc="c['documento']"/><td t-esc="fmt(c['data'])"/><td class="text-end" t-esc="fmt(c['quantidade'])"/></tr>
+        </table>
+      </t>
+      <t t-if="r['guias_sem_fatura']">
+        <p class="text-warning small mb-1"><i class="fa fa-exclamation-triangle me-1"/>Expedições sem fatura do mesmo cliente (rastreabilidade pode estar incompleta):</p>
+        <table class="table table-sm small">
+          <tr t-foreach="r['guias_sem_fatura']" t-as="g"><td t-esc="g['cliente']"/><td t-esc="g['documento']"/><td t-esc="fmt(g['data'])"/><td class="text-end" t-esc="fmt(g['quantidade'])"/></tr>
+        </table>
+      </t>
+      <t t-if="r['devolucoes']">
+        <h6 class="mt-2">Devoluções e notas de crédito</h6>
+        <table class="table table-sm small">
+          <tr t-foreach="r['devolucoes']" t-as="c"><td t-esc="c['cliente']"/><td t-esc="c['documento']"/><td t-esc="fmt(c['data'])"/><td class="text-end" t-esc="fmt(c['quantidade'])"/></tr>
+        </table>
+      </t>
+      <p class="text-muted small mt-2 mb-0">Dados lidos do Primavera agora (só leitura); não ficam gravados no Odoo.</p>
+    </div>
+  </template>
+
+  <!-- Página "outros produtos acabados com este lote de material" (abre noutro separador do browser) -->
+  <template id="rastreio_material_pagina">
+    <html lang="pt">
+      <head>
+        <meta charset="utf-8"/>
+        <title>Rastreabilidade — <t t-esc="r['artigo']"/> <t t-esc="r['lote']"/></title>
+        <style>
+          body { font-family: system-ui, sans-serif; margin: 16px; color: #222; }
+          table { border-collapse: collapse; width: 100%; font-size: 13px; }
+          td, th { border-bottom: 1px solid #ddd; padding: 4px 6px; text-align: left; vertical-align: top; }
+          th { color: #666; font-weight: normal; }
+          .aviso { background: #fff3cd; padding: 6px 10px; margin-bottom: 10px; }
+          .muted { color: #777; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <h2>Outros produtos acabados com o lote <t t-esc="r['lote']"/></h2>
+        <p><b t-esc="r['artigo']"/> <t t-esc="r['descricao']"/></p>
+        <div t-foreach="r['avisos']" t-as="a" class="aviso" t-esc="a"/>
+        <p t-if="not r['produtos'] and not r['avisos']">Este lote não foi consumido em nenhuma COM.</p>
+        <table t-if="r['produtos']">
+          <tr><th>Produto acabado</th><th>Lote</th><th>COM</th><th>Data da COM</th><th>Consumo</th><th>Clientes (faturas FA/FAT/FRT)</th></tr>
+          <tr t-foreach="r['produtos']" t-as="p">
+            <td><t t-esc="p['artigo']"/><br/><span class="muted" t-esc="p['descricao']"/></td>
+            <td t-esc="p['lote']"/><td t-esc="p['com']"/><td t-esc="fmt(p['data'])"/><td t-esc="fmt(p['consumo'])"/>
+            <td>
+              <t t-if="not p['clientes']"><span class="muted">sem faturas</span></t>
+              <div t-foreach="p['clientes']" t-as="c"><t t-esc="c['cliente']"/> · <t t-esc="fmt(c['quantidade'])"/> (<t t-esc="c['documentos']"/> doc.)</div>
+            </td>
+          </tr>
+        </table>
+        <p class="muted">Dados lidos do Primavera agora (só leitura); não ficam gravados no Odoo.</p>
+      </body>
+    </html>
+  </template>
+
+</odoo>

@@ -1,7 +1,7 @@
 {
     'web_icon': 'qualidade_reclamacoes/static/description/icon.png',
     'name': 'Qualidade - Reclamações',
-    'version': '1.8.0',
+    'version': '1.9.0',
     'summary': 'Gestão de reclamações por Qualidade (respostas e estado)',
     'category': 'Operations',
     'author': 'A tua empresa',
@@ -10,6 +10,7 @@
         'security/security.xml',
         'security/attachment_access.xml',
         'security/ir.model.access.csv',
+        'views/rastreabilidade_templates.xml',
         'views/dashboard_views.xml',
         'views/qualidade_cliente_views.xml',
         'views/qualidade_fornecedor_views.xml',

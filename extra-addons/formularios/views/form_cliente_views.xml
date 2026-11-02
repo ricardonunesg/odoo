@@ -32,7 +32,7 @@
                   <field name="artigo_id" options="{'no_create': True, 'no_create_edit': True}"/>
                   <field name="codigo_artigo"/>
                   <field name="descricao_artigo"/>
-                  <field name="lote"/>
+                  <field name="lote" widget="lote_primavera"/>
                 </list>
               </field>
             </group>

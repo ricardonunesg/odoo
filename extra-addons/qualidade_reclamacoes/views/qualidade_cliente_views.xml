@@ -56,6 +56,18 @@
             <group string="Evidências / Anexos">
               <field name="anexos_ids" widget="qualidade_anexos_preview"/>
             </group>
+
+            <!-- Rastreabilidade do lote reclamado: lida do Primavera (só leitura) só quando se liga "Consultar" -->
+            <notebook>
+              <page string="Rastreabilidade" name="rastreabilidade">
+                <group>
+                  <field name="rastreio_linha_id" domain="[('form_id', '=', reclamacao_id)]"
+                         options="{'no_create': True, 'no_open': True}"/>
+                  <field name="rastreio_consultar" widget="boolean_toggle" options="{'autosave': false}"/>
+                </group>
+                <field name="rastreio_html" nolabel="1" readonly="1" invisible="not rastreio_consultar"/>
+              </page>
+            </notebook>
           </sheet>
         </form>
       </field>
