@@ -24,10 +24,11 @@ class FormReclamacaoClienteLinha(models.Model):
     descricao_artigo = fields.Char(string='Descrição Artigo (Primavera)', required=True)
     lote = fields.Char(string='Lote', required=True)
 
-    @api.depends('codigo_artigo', 'lote')
+    @api.depends('descricao_artigo', 'codigo_artigo', 'lote')
     def _compute_display_name(self):
+        # descrição do artigo (Primavera) — lote; o código continua a ser o que se usa nas consultas
         for rec in self:
-            rec.display_name = ' — '.join(x for x in (rec.codigo_artigo, rec.lote) if x) or _('Linha de artigo')
+            rec.display_name = ' — '.join(x for x in (rec.descricao_artigo or rec.codigo_artigo, rec.lote) if x) or _('Linha de artigo')
 
     @api.model
     def lotes_vendidos_primavera(self, codigo_artigo, partner_id):
