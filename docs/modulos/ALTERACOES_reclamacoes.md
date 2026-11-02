@@ -3,6 +3,15 @@
 Cópias dos documentos oficiais em `/srv/partilhada/Modulos ODOO_Relatórios/` (3.Formularios.docx,
 10. Qualidade_Reclamacoes.docx, 0.Indice_Modulos.docx), guardadas aqui para histórico.
 
+## 02/11/2026 — Fase 2, Ponto 4c: "Artigo / lote reclamado" com a descrição (formularios 18.0.1.5.2)
+
+- A linha de artigo aparece como "descrição actual do artigo no Primavera — lote" (artigos sincronizados no Odoo;
+  sem artigo com esse código, a descrição gravada). O código continua a ser usado nas consultas.
+- Produção (02/11 22:23, commits 8af60c3 + efb3f8e): só Formulários, 0 erros; 44/44 linhas com a descrição do
+  Primavera (2 códigos antigos mal escritos mostram a descrição gravada); RCL/2026/0024 consulta o artigo/lote certos.
+- Reversão: repor formularios/models/form_cliente_linha.py e __manifest__.py da versão 4f8ed5a (backups *pre-f2p4c*);
+  -u formularios.
+
 ## 02/11/2026 — Fase 2, Ponto 4b: Rastreabilidade no topo do Responder (qualidade_reclamacoes 18.0.1.9.1)
 
 - Interruptor "Rastreabilidade" logo abaixo de "Imprimir PDF da reclamação": liga = mostra por baixo, desliga =
