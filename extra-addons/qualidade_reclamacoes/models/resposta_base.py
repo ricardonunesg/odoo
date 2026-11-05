@@ -53,7 +53,6 @@ class QualidadeRespostaBase(models.AbstractModel):
     def create(self, vals_list):
         records = super().create(vals_list)
         records._normalize_anexos_ids()
-        records.reclamacao_id._sincronizar_atividade()
         return records
 
     def write(self, vals):
@@ -64,12 +63,4 @@ class QualidadeRespostaBase(models.AbstractModel):
         res = super().write(vals)
         if 'anexos_ids' in vals:
             self._normalize_anexos_ids()
-        if 'estado_resposta' in vals or 'data' in vals:
-            self.reclamacao_id._sincronizar_atividade()
-        return res
-
-    def unlink(self):
-        reclamacoes = self.reclamacao_id
-        res = super().unlink()
-        reclamacoes.exists()._sincronizar_atividade()
         return res

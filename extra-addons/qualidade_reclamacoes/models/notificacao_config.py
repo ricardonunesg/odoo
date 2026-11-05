@@ -3,7 +3,7 @@ from odoo.exceptions import ValidationError
 
 
 class QualidadeNotificacaoConfig(models.Model):
-    """Quem trata e quem é avisado de cada reclamação nova, por tipo. 3 linhas fixas (Clientes, Fornecedores,
+    """Quem é notificado de cada reclamação nova, por tipo. 3 linhas fixas (Clientes, Fornecedores,
     Internas), editadas só por administradores. Os emails formais não dependem desta configuração."""
     _name = 'qualidade.notificacao.config'
     _description = 'Qualidade - Responsáveis e notificações'
@@ -20,7 +20,8 @@ class QualidadeNotificacaoConfig(models.Model):
     responsavel_id = fields.Many2one('res.users', string='Responsável principal', domain=_dominio_qualidade)
     informado_ids = fields.Many2many('res.users', 'qualidade_notificacao_config_users_rel', 'config_id', 'user_id',
                                      string='Informados', domain=_dominio_qualidade)
-    prazo_dias = fields.Integer(string='Prazo (dias)', required=True, default=7)
+    prazo_dias = fields.Integer(string='Prazo (dias, uso futuro)', required=True, default=7,
+                                help='Guardado para utilização futura: nesta versão não gera lembretes nem atividades.')
 
     _sql_constraints = [('tipo_unico', 'unique(tipo)', 'Só pode existir uma linha por tipo de reclamação.')]
 

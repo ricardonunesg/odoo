@@ -2,13 +2,6 @@
 <odoo>
   <!-- noupdate: as atualizações do módulo não mexem no que for configurado. Instala com os 3 tipos DESATIVADOS. -->
   <data noupdate="1">
-    <record id="mail_activity_type_tratar_reclamacao" model="mail.activity.type">
-      <field name="name">Tratar reclamação</field>
-      <field name="summary">Tratar reclamação</field>
-      <field name="icon">fa-exclamation-circle</field>
-      <field name="sequence">50</field>
-    </record>
-
     <record id="notificacao_config_cliente" model="qualidade.notificacao.config">
       <field name="tipo">cliente</field>
       <field name="nome">Clientes</field>

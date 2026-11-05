@@ -39,7 +39,7 @@
       <field name="code">action = env['form.reclama.fornecedor'].browse(env.context.get('active_id')).exists().action_responder_fornecedor()</field>
     </record>
 
-    <!-- Quem chega à ficha da reclamação (nome no menu das atividades): Responder a 1 clique -->
+    <!-- Quem chega à ficha da reclamação (nome da reclamação na notificação): Responder a 1 clique -->
     <record id="view_form_reclama_cliente_responder" model="ir.ui.view">
       <field name="name">form.reclama.cliente.form.responder</field>
       <field name="model">form.reclama.cliente</field>
