@@ -3,7 +3,16 @@
 Cópias dos documentos oficiais em `/srv/partilhada/Modulos ODOO_Relatórios/` (3.Formularios.docx,
 10. Qualidade_Reclamacoes.docx, 0.Indice_Modulos.docx), guardadas aqui para histórico.
 
-## 05/11/2026 — Fase 2, Ponto 5: atividades e avisos de reclamações novas (qualidade_reclamacoes 18.0.1.10.0)
+## 05/11/2026 — Fase 2, Ponto 5: só notificações, sem Activities (qualidade_reclamacoes 18.0.1.11.0)
+
+- Decisão: as reclamações não criam Activities (ficam para lembretes e follow-ups). Retirados a atividade, a conclusão
+  automática e o tipo "Tratar reclamação". Com o tipo ativo: 1 notificação ao responsável ("Nova reclamação para
+  tratar") e 1 a cada informado ("Nova reclamação"), com link "Abrir no Responder". Prazo guardado para uso futuro.
+- Produção (05/11 22:47, commit 722f42a): só a Qualidade, 0 erros; 3 tipos DESATIVADOS; dados, indicadores, numeração
+  e Activities iguais; verificação 10/10 + pacote JS.
+- Reversão: /home/odoo/backups/REVERSAO_f2p5_notificacoes.md
+
+## 05/11/2026 — Fase 2, Ponto 5 (1.ª versão, substituída): atividades e avisos (qualidade_reclamacoes 18.0.1.10.0)
 
 - Menu Qualidade → Configuração → Responsáveis e notificações (3 linhas, só administradores): ativo, responsável,
   informados e prazo por tipo. Instalado com os 3 tipos DESATIVADOS (Ricardo, Rita, 7 dias).
