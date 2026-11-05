@@ -3,16 +3,37 @@
 Cópias dos documentos oficiais em `/srv/partilhada/Modulos ODOO_Relatórios/` (3.Formularios.docx,
 10. Qualidade_Reclamacoes.docx, 0.Indice_Modulos.docx), guardadas aqui para histórico.
 
+## Estado atual em produção (05/11/2026)
+
+- Qualidade 18.0.1.11.0 e Formulários 18.0.1.5.2. Fases 1 e 2 concluídas.
+- Notificações ATIVAS para Clientes, Fornecedores e Internas: Ricardo Machado responsável, Rita Faroleira informada.
+- Prazo de 7 dias apenas informativo, sem lembretes automáticos. As reclamações não criam Activities.
+- Depois de atualizar módulos com JavaScript é preciso recarregar a página do Odoo (F5).
+
+**Ordem de implementação:** Reclamações Internas (31/10) · Fase 1: só administradores apagam (31/10), reorganização
+do código (31/10), numeração RCL/RFO/RIN (01/11), filtros e pesquisa (01/11), artigos no Dashboard (01/11) ·
+Fase 2: ficha do Responder (01/11), pré-visualização de anexos (01/11), artigos e colunas nas listas (02/11),
+rastreabilidade de clientes e lotes nos Formulários (02/11), notificações no Discuss (05/11).
+
+**Previsto, ainda não existe:** Pendentes no Discuss (Por tratar, Por aprovar, filtro Atrasados), independentes das
+Activities; rastreabilidade de Fornecedores e Internas.
+
+## 05/11/2026 — Fase 2, Ponto 5: ativação das notificações (sem alteração de código)
+
+- Ativados em produção os 3 tipos (Clientes, Fornecedores, Internas), com autorização do Gonçalo: Ricardo, Rita, 7 dias.
+- Só a opção Ativo da configuração. Sem Activities, sem notificações retroativas, dados e indicadores iguais.
+- Desligar sem reverter: pôr os tipos em Inativo em Qualidade → Configuração → Responsáveis e notificações.
+
 ## 05/11/2026 — Fase 2, Ponto 5: só notificações, sem Activities (qualidade_reclamacoes 18.0.1.11.0)
 
 - Decisão: as reclamações não criam Activities (ficam para lembretes e follow-ups). Retirados a atividade, a conclusão
   automática e o tipo "Tratar reclamação". Com o tipo ativo: 1 notificação ao responsável ("Nova reclamação para
   tratar") e 1 a cada informado ("Nova reclamação"), com link "Abrir no Responder". Prazo guardado para uso futuro.
-- Produção (05/11 22:47, commit 722f42a): só a Qualidade, 0 erros; 3 tipos DESATIVADOS; dados, indicadores, numeração
-  e Activities iguais; verificação 10/10 + pacote JS.
+- Produção (05/11 22:47, commit 722f42a): só a Qualidade, 0 erros; instalada com os 3 tipos inativos (ativados depois,
+  ver entrada acima); dados, indicadores, numeração e Activities iguais; verificação 10/10 + pacote JS.
 - Reversão: /home/odoo/backups/REVERSAO_f2p5_notificacoes.md
 
-## 05/11/2026 — Fase 2, Ponto 5 (1.ª versão, substituída): atividades e avisos (qualidade_reclamacoes 18.0.1.10.0)
+## 05/11/2026 — Fase 2, Ponto 5 (1.ª versão, SUBSTITUÍDA pela 18.0.1.11.0, sem Activities): atividades e avisos (qualidade_reclamacoes 18.0.1.10.0)
 
 - Menu Qualidade → Configuração → Responsáveis e notificações (3 linhas, só administradores): ativo, responsável,
   informados e prazo por tipo. Instalado com os 3 tipos DESATIVADOS (Ricardo, Rita, 7 dias).
