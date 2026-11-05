@@ -3,6 +3,15 @@
 Cópias dos documentos oficiais em `/srv/partilhada/Modulos ODOO_Relatórios/` (3.Formularios.docx,
 10. Qualidade_Reclamacoes.docx, 0.Indice_Modulos.docx), guardadas aqui para histórico.
 
+## 05/11/2026 — Fase 2, Ponto 5: atividades e avisos de reclamações novas (qualidade_reclamacoes 18.0.1.10.0)
+
+- Menu Qualidade → Configuração → Responsáveis e notificações (3 linhas, só administradores): ativo, responsável,
+  informados e prazo por tipo. Instalado com os 3 tipos DESATIVADOS (Ricardo, Rita, 7 dias).
+- Atividade única "Tratar reclamação" na reclamação, aviso aos informados, link "Abrir no Responder", conclusão
+  automática em Fechado, nova atividade ao reabrir, botão Responder na ficha da reclamação. Emails formais iguais.
+- Produção (05/11 21:16, commit 8b7c8c3): só a Qualidade, 0 erros; dados, indicadores e numeração iguais.
+- Reversão: /home/odoo/backups/REVERSAO_f2p5_notificacoes.md
+
 ## 02/11/2026 — Fase 2, Ponto 4c: "Artigo / lote reclamado" com a descrição (formularios 18.0.1.5.2)
 
 - A linha de artigo aparece como "descrição actual do artigo no Primavera — lote" (artigos sincronizados no Odoo;
