@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <!-- noupdate: as atualizações do módulo não mexem no que for configurado. Instala com os 3 tipos DESATIVADOS. -->
+  <data noupdate="1">
+    <record id="mail_activity_type_tratar_reclamacao" model="mail.activity.type">
+      <field name="name">Tratar reclamação</field>
+      <field name="summary">Tratar reclamação</field>
+      <field name="icon">fa-exclamation-circle</field>
+      <field name="sequence">50</field>
+    </record>
+
+    <record id="notificacao_config_cliente" model="qualidade.notificacao.config">
+      <field name="tipo">cliente</field>
+      <field name="nome">Clientes</field>
+      <field name="ativo" eval="False"/>
+      <field name="prazo_dias">7</field>
+    </record>
+    <record id="notificacao_config_fornecedor" model="qualidade.notificacao.config">
+      <field name="tipo">fornecedor</field>
+      <field name="nome">Fornecedores</field>
+      <field name="ativo" eval="False"/>
+      <field name="prazo_dias">7</field>
+    </record>
+    <record id="notificacao_config_interna" model="qualidade.notificacao.config">
+      <field name="tipo">interna</field>
+      <field name="nome">Internas</field>
+      <field name="ativo" eval="False"/>
+      <field name="prazo_dias">7</field>
+    </record>
+  </data>
+</odoo>

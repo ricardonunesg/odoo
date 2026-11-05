@@ -1,6 +1,15 @@
+import logging
+from datetime import timedelta
+
+from markupsafe import Markup
+
 from odoo import models, fields, api
 
 from .constantes import ESTADOS_RESPOSTA, CATEGORIAS, ORIGENS, GRAVIDADES
+
+_logger = logging.getLogger(__name__)
+
+TIPO_ATIVIDADE = 'qualidade_reclamacoes.mail_activity_type_tratar_reclamacao'
 
 
 class QualidadeUltimaRespostaMixin(models.AbstractModel):
@@ -102,6 +111,72 @@ class QualidadeUltimaRespostaMixin(models.AbstractModel):
             rec.artigos_descricao = '\n'.join(d or '—' for c, d, lt in linhas)
             rec.artigos_lote = '\n'.join(lt or '—' for c, d, lt in linhas)
 
+    # ---------- Atividade "Tratar reclamação" e avisos (Qualidade → Configuração → Responsáveis e notificações) ----------
+
+    def _message_auto_subscribe(self, updated_values, followers_of_creator=False):
+        # sem seguidores nem avisos automáticos ao mudar o utilizador da reclamação: só o que está na configuração
+        return True
+
+    def _tipo_notificacao(self):
+        return 'cliente'
+
+    def _url_responder(self):
+        """Link que abre a lista da Qualidade e, por cima, a janela do Responder (não cria nem grava respostas)."""
+        return '%s/odoo/action-qualidade_abrir_responder?tipo=%s&reclamacao=%d' % (
+            self.get_base_url(), self._tipo_notificacao(), self.id)
+
+    def _atividades_pendentes(self):
+        tipo = self.env.ref(TIPO_ATIVIDADE)
+        return self.sudo().activity_ids.filtered(lambda a: a.activity_type_id == tipo)
+
+    def _resumo_aviso(self):
+        artigos = (self.artigos_descricao or '').replace('\n', '; ')
+        return ' — '.join(x for x in (self.name, self[self._campo_nome], artigos) if x)
+
+    def _criar_atividade_tratar(self, avisar_informados=False):
+        """Atividade única para o responsável configurado (+ aviso aos informados, só em reclamações novas).
+        Um tipo inativo ou sem responsável não faz nada."""
+        self.ensure_one()
+        cfg = self.env['qualidade.notificacao.config'].sudo().search([('tipo', '=', self._tipo_notificacao())], limit=1)
+        if not cfg.ativo or not cfg.responsavel_id or self._atividades_pendentes():
+            return
+        rec = self.sudo()
+        link = Markup('<a href="%s">Abrir no Responder</a>') % self._url_responder()
+        resumo = self._resumo_aviso()
+        rec.activity_schedule(TIPO_ATIVIDADE, summary='Tratar reclamação',
+                              date_deadline=fields.Date.context_today(self) + timedelta(days=cfg.prazo_dias),
+                              note=Markup('<p>%s</p><p>%s</p>') % (resumo, link), user_id=cfg.responsavel_id.id)
+        informados = cfg.informado_ids - cfg.responsavel_id
+        if avisar_informados and informados:
+            rec.message_notify(partner_ids=informados.partner_id.ids, subject='Nova reclamação %s' % self.name,
+                               body=Markup('<p>Nova reclamação: %s</p><p>%s</p>') % (resumo, link),
+                               record_name=self.name, email_layout_xmlid='mail.mail_notification_light')
+
+    def _notificar_nova_reclamacao(self):
+        for rec in self:
+            try:
+                with self.env.cr.savepoint():
+                    rec._criar_atividade_tratar(avisar_informados=True)
+            except Exception:  # a reclamação e o email formal seguem sempre, mesmo que o aviso falhe
+                _logger.exception("Reclamação %s: não foi possível criar a atividade/aviso", rec.name)
+
+    def _sincronizar_atividade(self):
+        """Depois de mudar uma resposta: Fechado conclui a atividade; reaberta (já teve atividade concluída) cria
+        uma nova. Reclamações sem atividade anterior (as antigas) não são tocadas."""
+        tipo = self.env.ref(TIPO_ATIVIDADE)
+        for rec in self:
+            try:
+                with self.env.cr.savepoint():
+                    if rec.ultima_resposta_estado == 'fechado':
+                        pendentes = rec._atividades_pendentes()
+                        if pendentes:
+                            pendentes.action_feedback(feedback='Reclamação fechada na Qualidade')
+                    elif not rec._atividades_pendentes() and self.env['mail.message'].sudo().search_count(
+                            [('model', '=', rec._name), ('res_id', '=', rec.id), ('mail_activity_type_id', '=', tipo.id)], limit=1):
+                        rec._criar_atividade_tratar()
+            except Exception:
+                _logger.exception("Reclamação %s: não foi possível actualizar a atividade", rec.name)
+
     def _abrir_resposta(self):
         self.ensure_one()
         resposta = self.env[self._modelo_resposta].search(
@@ -130,7 +205,7 @@ class QualidadeUltimaRespostaMixin(models.AbstractModel):
 
 class FormCliente(models.Model):
     _name = 'form.reclama.cliente'
-    _inherit = ['form.reclama.cliente', 'qualidade.ultima.resposta.mixin']
+    _inherit = ['form.reclama.cliente', 'qualidade.ultima.resposta.mixin', 'mail.thread', 'mail.activity.mixin']
 
     _modelo_resposta = 'qualidade.resposta.cliente'
     _titulo_responder = 'Responder (Cliente)'
@@ -138,19 +213,35 @@ class FormCliente(models.Model):
 
     resposta_ids = fields.One2many('qualidade.resposta.cliente', 'reclamacao_id', string='Respostas (Qualidade)')
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        # tracking_disable: sem seguidores nem mensagem de criação; os avisos são só os da configuração
+        records = super(FormCliente, self.with_context(tracking_disable=True)).create(vals_list).with_env(self.env)
+        records._notificar_nova_reclamacao()
+        return records
+
     def action_responder_cliente(self):
         return self._abrir_resposta()
 
 
 class FormFornecedor(models.Model):
     _name = 'form.reclama.fornecedor'
-    _inherit = ['form.reclama.fornecedor', 'qualidade.ultima.resposta.mixin']
+    _inherit = ['form.reclama.fornecedor', 'qualidade.ultima.resposta.mixin', 'mail.thread', 'mail.activity.mixin']
 
     _modelo_resposta = 'qualidade.resposta.fornecedor'
     _titulo_responder = 'Responder (Fornecedor)'
     _campo_lote = 'lote_guia_fatura'
 
     resposta_ids = fields.One2many('qualidade.resposta.fornecedor', 'reclamacao_id', string='Respostas (Qualidade)')
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super(FormFornecedor, self.with_context(tracking_disable=True)).create(vals_list).with_env(self.env)
+        records._notificar_nova_reclamacao()
+        return records
+
+    def _tipo_notificacao(self):
+        return 'interna' if self.tipo_reclamacao == 'interna' else 'fornecedor'
 
     def action_responder_fornecedor(self):
         return self._abrir_resposta()

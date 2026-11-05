@@ -58,5 +58,9 @@
     <menuitem id="menu_qualidade_internas" name="Reclamações Internas"
               parent="menu_qualidade_root" action="qualidade_reclamacoes.action_qualidade_interna" sequence="30"
               groups="qualidade_reclamacoes.group_qualidade_eng"/>
+    <menuitem id="menu_qualidade_configuracao" name="Configuração" parent="menu_qualidade_root" sequence="90" groups="base.group_system"/>
+    <menuitem id="menu_qualidade_notificacao_config" name="Responsáveis e notificações"
+              parent="menu_qualidade_configuracao" action="qualidade_reclamacoes.action_qualidade_notificacao_config" sequence="10"
+              groups="base.group_system"/>
   </data>
 </odoo>
