@@ -5,7 +5,7 @@ Cópias dos documentos oficiais em `/srv/partilhada/Modulos ODOO_Relatórios/` (
 
 ## Estado atual em produção (06/11/2026)
 
-- Qualidade 18.0.1.12.0 e Formulários 18.0.1.5.2. Fases 1 e 2 concluídas.
+- Qualidade 18.0.1.12.0 e Formulários 18.0.1.5.3. Fases 1 e 2 concluídas.
 - Notificações ATIVAS para Clientes, Fornecedores e Internas: Ricardo Machado responsável, Rita Faroleira informada.
 - Prazo de 7 dias apenas informativo, sem lembretes automáticos. As reclamações não criam Activities.
 - Depois de atualizar módulos com JavaScript é preciso recarregar a página do Odoo (F5).
@@ -18,6 +18,15 @@ agrupar por Cliente/Fornecedor, Artigo e Lote (06/11).
 
 **Previsto, ainda não existe:** Pendentes no Discuss (Por tratar, Por aprovar, filtro Atrasados), independentes das
 Activities; rastreabilidade de Fornecedores e Internas.
+
+## 06/11/2026 — Formulários: lista de lotes no próprio campo Lote (formularios 18.0.1.5.3)
+
+- O campo Lote das reclamações de clientes abre, ao clicar, os lotes faturados ao cliente (lote, documento e data) e
+  filtra ao escrever. Sem botão separado e sem salto da página ao escolher. Escrita manual mantida.
+- A consulta ao Primavera não mudou. Sem lotes ou com o Primavera indisponível: aviso e escrita manual.
+- Ensaio isolado: browser 13/13. Produção (06/11 19:03, commit 4d4a2c5): só os Formulários, 0 erros, browser 7/7 sem gravar.
+- Reversão: repor os ficheiros da versão 2204e79 (backups *2026-11-06_pre-lote*), apagar lote_primavera_field.scss;
+  -u formularios; F5.
 
 ## 06/11/2026 — Agrupar por Cliente/Fornecedor, Artigo e Lote (qualidade_reclamacoes 18.0.1.12.0)
 
