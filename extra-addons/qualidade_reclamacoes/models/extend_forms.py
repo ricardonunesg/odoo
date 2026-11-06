@@ -25,6 +25,10 @@ class QualidadeUltimaRespostaMixin(models.AbstractModel):
     artigos_codigo = fields.Text(string='Código Artigo', compute='_compute_artigos_lista')
     artigos_descricao = fields.Text(string='Descrição Artigo', compute='_compute_artigos_lista')
     artigos_lote = fields.Text(string='Lote / Guia / Fatura', compute='_compute_artigos_lista')
+    # Agrupar por Artigo / Lote nas listas: um só valor por reclamação (com vários artigos, todos juntos), para cada
+    # reclamação ficar num único grupo, sem duplicar nos totais. Agrupa pelo código; a descrição é a actual do Primavera.
+    grupo_artigo = fields.Char(string='Artigo', compute='_compute_grupos', store=True)
+    grupo_lote = fields.Char(string='Lote', compute='_compute_grupos', store=True)
 
     # Guardados (para filtrar e agrupar nas listas da Qualidade); recalculados sempre que uma resposta
     # é criada, alterada (incluindo a data) ou eliminada. Sem respostas ficam vazios ("Sem resposta").
@@ -149,6 +153,27 @@ class QualidadeUltimaRespostaMixin(models.AbstractModel):
                     rec._avisar_nova_reclamacao()
             except Exception:  # a reclamação e o email formal seguem sempre, mesmo que o aviso falhe
                 _logger.exception("Reclamação %s: não foi possível enviar as notificações", rec.name)
+
+    def _nomes_artigos(self):
+        """{código: descrição actual} dos artigos sincronizados do Primavera, para os códigos destas reclamações."""
+        codigos = {(c or '').strip() for c in self.linha_ids.mapped('codigo_artigo') + self.mapped('codigo_artigo')} - {''}
+        return {p.primavera_code: p.name for p in self.env['product.template'].sudo().with_context(active_test=False).search(
+            [('primavera_code', 'in', list(codigos))])} if codigos else {}
+
+    def _valores_grupos(self, nomes):
+        self.ensure_one()
+        linhas = [(l.codigo_artigo, l.descricao_artigo, l[self._campo_lote]) for l in self.linha_ids] \
+            or [(self.codigo_artigo, self.descricao_artigo, self[self._campo_lote])]
+        artigos = {(c or '').strip(): (d or '').strip() for c, d, _lote in linhas if c or d}
+        rotulos = [' — '.join(x for x in (c, nomes.get(c) or d) if x) for c, d in sorted(artigos.items())]
+        lotes = sorted({(lote or '').strip() for _c, _d, lote in linhas} - {''})
+        return ' + '.join(rotulos) or False, ' + '.join(lotes) or False
+
+    @api.depends(lambda self: self._depends_artigos_lista())
+    def _compute_grupos(self):
+        nomes = self._nomes_artigos()
+        for rec in self:
+            rec.grupo_artigo, rec.grupo_lote = rec._valores_grupos(nomes)
 
     def _abrir_resposta(self):
         self.ensure_one()

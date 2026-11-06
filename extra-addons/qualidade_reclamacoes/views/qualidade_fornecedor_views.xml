@@ -137,6 +137,9 @@
           <filter name="data_conclusao" string="Data de conclusão" date="ultima_data_conclusao"/>
           <filter name="data_fecho" string="Data de fecho" date="ultima_data_fecho"/>
           <group expand="0" string="Agrupar por">
+            <filter name="agrupar_entidade" string="Fornecedor / Instalação" context="{'group_by': 'fornecedor'}"/>
+            <filter name="agrupar_artigo" string="Artigo" context="{'group_by': 'grupo_artigo'}"/>
+            <filter name="agrupar_lote" string="Lote" context="{'group_by': 'grupo_lote'}"/>
             <filter name="agrupar_estado" string="Estado" context="{'group_by': 'ultima_resposta_estado'}"/>
             <filter name="agrupar_gravidade" string="Gravidade" context="{'group_by': 'ultima_gravidade'}"/>
             <filter name="agrupar_categoria" string="Categoria" context="{'group_by': 'ultima_categoria'}"/>
