@@ -1,0 +1,9 @@
+.o_lote_primavera .o-autocomplete--dropdown-menu {
+    min-width: 26rem;
+}
+
+.o_lote_primavera_opcao {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1fr;
+    gap: 1rem;
+}

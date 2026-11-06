@@ -1,7 +1,7 @@
 {
     'web_icon': 'formularios/static/description/icon.png',
     'name': 'Formulários',
-    'version': '1.5.2',
+    'version': '1.5.3',
     'summary': 'Formulários de reclamações (Cliente e Fornecedor)',
     'category': 'Operations',
     'author': 'A tua empresa',
@@ -20,6 +20,7 @@
         'web.assets_backend': [
             'formularios/static/src/lote_primavera/lote_primavera_field.js',
             'formularios/static/src/lote_primavera/lote_primavera_field.xml',
+            'formularios/static/src/lote_primavera/lote_primavera_field.scss',
         ],
     },
     'application': True,

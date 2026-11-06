@@ -1,21 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
-    <t t-name="formularios.LotePrimaveraField" t-inherit="web.CharField" t-inherit-mode="primary">
-        <xpath expr="//div[hasclass('o_field_input_buttons')]" position="inside">
-            <!-- o conteúdo do menu é desenhado depois de carregar os lotes (beforeOpen) -->
-            <Dropdown beforeOpen.bind="carregarLotes">
-                <button type="button" class="btn btn-link m-0 py-0 px-2 o_lote_primavera_btn" title="Lotes deste artigo faturados ao cliente (Primavera)">
-                    <i class="fa fa-list-ul"/>
-                </button>
-                <t t-set-slot="content">
-                    <t t-if="lotes.itens.length">
-                        <DropdownItem t-foreach="lotes.itens" t-as="l" t-key="l.lote" onSelected="() => this.escolherLote(l)">
-                            <b t-esc="l.lote"/> <span class="text-muted small" t-esc="'· ' + l.documento + ' · ' + l.data"/>
-                        </DropdownItem>
-                    </t>
-                    <div t-else="" class="dropdown-item-text text-muted small" t-esc="lotes.mensagem"/>
-                </t>
-            </Dropdown>
-        </xpath>
+    <t t-name="formularios.LotePrimaveraField">
+        <span t-if="props.readonly" t-esc="valor"/>
+        <AutoComplete t-else="" id="props.id" class="'o_lote_primavera'" value="valor" sources="fontes"
+                      onSelect.bind="escolher" input="input"/>
+    </t>
+
+    <t t-name="formularios.LotePrimaveraOpcao">
+        <span t-if="option.mensagem" class="text-muted" t-esc="option.label"/>
+        <span t-else="" class="o_lote_primavera_opcao">
+            <b t-esc="option.lote"/>
+            <span t-esc="option.documento"/>
+            <span t-esc="option.data"/>
+        </span>
     </t>
 </templates>

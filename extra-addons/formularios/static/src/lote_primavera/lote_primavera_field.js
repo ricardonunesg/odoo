@@ -1,44 +1,72 @@
 /** @odoo-module **/
-// Campo Lote com botão de lotes faturados ao cliente (Primavera, só leitura). O lote continua a poder ser escrito à mão.
-import { useState } from "@odoo/owl";
+// Campo Lote: ao clicar mostra os lotes do artigo faturados ao cliente (Primavera, só leitura) e, ao escrever, filtra.
+// O lote pode ser sempre escrito à mão (useInputField grava o texto, como num campo normal).
+import { Component } from "@odoo/owl";
 import { registry } from "@web/core/registry";
-import { useService } from "@web/core/utils/hooks";
-import { Dropdown } from "@web/core/dropdown/dropdown";
-import { DropdownItem } from "@web/core/dropdown/dropdown_item";
-import { CharField, charField } from "@web/views/fields/char/char_field";
+import { useChildRef, useService } from "@web/core/utils/hooks";
+import { AutoComplete } from "@web/core/autocomplete/autocomplete";
+import { useInputField } from "@web/views/fields/input_field_hook";
+import { standardFieldProps } from "@web/views/fields/standard_field_props";
 
-export class LotePrimaveraField extends CharField {
+export class LotePrimaveraField extends Component {
     static template = "formularios.LotePrimaveraField";
-    static components = { ...CharField.components, Dropdown, DropdownItem };
+    static components = { AutoComplete };
+    static props = { ...standardFieldProps };
 
     setup() {
-        super.setup();
         this.orm = useService("orm");
-        this.lotes = useState({ itens: [], mensagem: "" });
+        this.input = useChildRef();
+        this.consulta = { chave: null, lotes: [], mensagem: "" };
+        useInputField({ ref: this.input, getValue: () => this.valor });
     }
 
-    escolherLote(l) {
-        this.props.record.update({ [this.props.name]: l.lote });
+    get valor() {
+        return this.props.record.data[this.props.name] || "";
     }
 
-    async carregarLotes() {
+    get fontes() {
+        return [{
+            placeholder: "A consultar o Primavera…",
+            optionTemplate: "formularios.LotePrimaveraOpcao",
+            options: (pesquisa) => this.opcoes(pesquisa),
+        }];
+    }
+
+    async consultar() {
         const linha = this.props.record;
         const cliente = linha._parentRecord && linha._parentRecord.data.cliente_partner_id;
-        this.lotes.itens = [];
-        if (!cliente || !linha.data.codigo_artigo) {
-            this.lotes.mensagem = "Escolha primeiro o cliente e o artigo.";
-            return;
+        const artigo = linha.data.codigo_artigo;
+        if (!cliente || !artigo) {
+            return { chave: null, lotes: [], mensagem: "Escolha primeiro o cliente e o artigo, ou escreva o lote." };
         }
-        this.lotes.mensagem = "A consultar o Primavera…";
-        try {
-            const r = await this.orm.call("form.reclama.cliente.linha", "lotes_vendidos_primavera", [linha.data.codigo_artigo, cliente[0]]);
-            this.lotes.itens = r.lotes;
-            this.lotes.mensagem = r.mensagem;
-        } catch {
-            this.lotes.mensagem = "Primavera indisponível — escreva o lote.";
+        const chave = `${cliente[0]}|${artigo}`;
+        if (this.consulta.chave !== chave) {
+            try {
+                const r = await this.orm.silent.call("form.reclama.cliente.linha", "lotes_vendidos_primavera", [artigo, cliente[0]]);
+                this.consulta = { chave, lotes: r.lotes, mensagem: r.mensagem };
+            } catch {
+                return { chave: null, lotes: [], mensagem: "Primavera indisponível — escreva o lote." };
+            }
+        }
+        return this.consulta;
+    }
+
+    async opcoes(pesquisa) {
+        const { lotes, mensagem } = await this.consultar();
+        const texto = pesquisa.toLowerCase();
+        const encontrados = lotes.filter((l) => l.lote.toLowerCase().includes(texto));
+        if (encontrados.length) {
+            return encontrados.map((l) => ({ label: l.lote, ...l }));
+        }
+        return !texto && mensagem ? [{ label: mensagem, mensagem: true }] : [];
+    }
+
+    escolher(opcao) {
+        if (!opcao.mensagem) {
+            this.props.record.update({ [this.props.name]: opcao.lote });
         }
     }
 }
 
-export const lotePrimaveraField = { ...charField, component: LotePrimaveraField };
+export const lotePrimaveraField = { component: LotePrimaveraField, supportedTypes: ["char"] };
 registry.category("fields").add("lote_primavera", lotePrimaveraField);
