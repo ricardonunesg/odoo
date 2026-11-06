@@ -3,9 +3,9 @@
 Cópias dos documentos oficiais em `/srv/partilhada/Modulos ODOO_Relatórios/` (3.Formularios.docx,
 10. Qualidade_Reclamacoes.docx, 0.Indice_Modulos.docx), guardadas aqui para histórico.
 
-## Estado atual em produção (05/11/2026)
+## Estado atual em produção (06/11/2026)
 
-- Qualidade 18.0.1.11.0 e Formulários 18.0.1.5.2. Fases 1 e 2 concluídas.
+- Qualidade 18.0.1.12.0 e Formulários 18.0.1.5.2. Fases 1 e 2 concluídas.
 - Notificações ATIVAS para Clientes, Fornecedores e Internas: Ricardo Machado responsável, Rita Faroleira informada.
 - Prazo de 7 dias apenas informativo, sem lembretes automáticos. As reclamações não criam Activities.
 - Depois de atualizar módulos com JavaScript é preciso recarregar a página do Odoo (F5).
@@ -13,10 +13,21 @@ Cópias dos documentos oficiais em `/srv/partilhada/Modulos ODOO_Relatórios/` (
 **Ordem de implementação:** Reclamações Internas (31/10) · Fase 1: só administradores apagam (31/10), reorganização
 do código (31/10), numeração RCL/RFO/RIN (01/11), filtros e pesquisa (01/11), artigos no Dashboard (01/11) ·
 Fase 2: ficha do Responder (01/11), pré-visualização de anexos (01/11), artigos e colunas nas listas (02/11),
-rastreabilidade de clientes e lotes nos Formulários (02/11), notificações no Discuss (05/11).
+rastreabilidade de clientes e lotes nos Formulários (02/11), notificações no Discuss (05/11). Depois das fases:
+agrupar por Cliente/Fornecedor, Artigo e Lote (06/11).
 
 **Previsto, ainda não existe:** Pendentes no Discuss (Por tratar, Por aprovar, filtro Atrasados), independentes das
 Activities; rastreabilidade de Fornecedores e Internas.
+
+## 06/11/2026 — Agrupar por Cliente/Fornecedor, Artigo e Lote (qualidade_reclamacoes 18.0.1.12.0)
+
+- 3 novos agrupamentos nas listas de Clientes, Fornecedores e Internas; os 8 existentes mantêm-se.
+- Artigo = "código — descrição atual do Primavera"; agrupa pelo código. Cada reclamação fica num único grupo: com vários
+  artigos ou lotes forma um grupo próprio com todos juntos, sem duplicar nem perder informação.
+- 2 valores guardados por reclamação, preenchidos por SQL na migração, sem mudar o Modificado por/em.
+- Produção (06/11 18:44, commit 2204e79): só a Qualidade, 0 erros, 19/19, dados e indicadores iguais.
+- Reversão: repor os ficheiros da versão 722f42a (backups *2026-11-06_pre-grupos*), apagar migrations/18.0.1.12.0/;
+  -u qualidade_reclamacoes. Ensaiada: 0 erros, Modificado por/em igual.
 
 ## 05/11/2026 — Fase 2, Ponto 5: ativação das notificações (sem alteração de código)
 
