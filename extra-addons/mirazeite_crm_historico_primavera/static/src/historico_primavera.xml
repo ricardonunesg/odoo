@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="mirazeite_crm_historico_primavera.Historico">
+        <div class="o_historico_primavera">
+            <t t-set="data" t-value="state.data"/>
+
+            <div t-if="state.loading" class="text-center text-muted py-5">
+                <i class="fa fa-circle-o-notch fa-spin me-2"/>A consultar o Primavera…
+            </div>
+
+            <div t-elif="data.error" class="alert alert-warning mb-0" role="alert">
+                <i class="fa fa-exclamation-triangle me-2"/><t t-esc="data.error"/>
+            </div>
+
+            <t t-else="">
+                <!-- Cliente e critérios -->
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                    <div>
+                        <div class="fs-5 fw-bold">
+                            <span class="badge text-bg-light border me-2" t-esc="data.customer.code"/>
+                            <t t-esc="data.customer.name"/>
+                        </div>
+                        <div class="small text-muted mt-1">
+                            <span t-if="data.customer.vat" class="me-3">NIF <t t-esc="data.customer.vat"/></span>
+                            <span t-if="data.customer.nif_validated" class="text-success me-3"
+                                  title="O NIF da ficha do Odoo é igual ao NIF do cliente no Primavera">
+                                <i class="fa fa-check-circle me-1"/>Correspondência validada por NIF
+                            </span>
+                            <span t-else="" class="text-warning me-3"
+                                  title="Um dos lados não tem NIF válido: a correspondência é só pelo código Primavera">
+                                <i class="fa fa-info-circle me-1"/>Correspondência só pelo código
+                            </span>
+                            <span t-if="data.customer.archived" class="badge text-bg-secondary">Cliente anulado no Primavera</span>
+                        </div>
+                    </div>
+                    <div class="text-end small text-muted">
+                        <div><t t-esc="data.period"/> · <t t-esc="data.doc_types"/></div>
+                        <div>Valores sem IVA · documentos anulados excluídos</div>
+                    </div>
+                </div>
+
+                <div t-if="!data.count" class="alert alert-info mb-0">
+                    <i class="fa fa-info-circle me-2"/>Sem faturas no período.
+                </div>
+
+                <t t-else="">
+                    <div class="d-flex justify-content-end gap-2 mb-2">
+                        <button class="btn btn-sm btn-link p-0" t-on-click="() => this.setAllInvoices(true)">
+                            <i class="fa fa-plus-square-o me-1"/>Expandir todas as faturas
+                        </button>
+                        <span class="text-muted">|</span>
+                        <button class="btn btn-sm btn-link p-0" t-on-click="() => this.setAllInvoices(false)">
+                            <i class="fa fa-minus-square-o me-1"/>Recolher faturas
+                        </button>
+                    </div>
+
+                    <div class="o_list_renderer table-responsive">
+                        <table class="o_list_table table table-sm table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Fatura</th>
+                                    <th class="o_hp_date">Data</th>
+                                    <th class="text-end o_hp_amount">Total sem IVA</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="data.years" t-as="year" t-key="year.year">
+                                    <t t-set="yearOpen" t-value="isYearOpen(year.year)"/>
+                                    <tr class="o_group_header o_hp_year" t-att-class="{ o_group_open: yearOpen }"
+                                        t-on-click="() => this.toggleYear(year.year)">
+                                        <th class="o_group_name" colspan="2">
+                                            <i t-attf-class="fa fa-fw me-1 {{ yearOpen ? 'fa-caret-down' : 'fa-caret-right' }}"/>
+                                            <t t-esc="year.year"/>
+                                            <span class="text-muted fw-normal ms-1">(<t t-esc="year.count"/>)</span>
+                                        </th>
+                                        <th class="text-end" t-esc="year.total"/>
+                                    </tr>
+                                    <t t-if="yearOpen">
+                                        <tr t-if="!year.count" class="o_hp_empty">
+                                            <td colspan="3" class="text-muted ps-5 fst-italic">Sem faturas neste ano.</td>
+                                        </tr>
+                                        <t t-foreach="year.invoices" t-as="inv" t-key="inv.id">
+                                            <t t-set="invOpen" t-value="state.openInvoices[inv.id]"/>
+                                            <tr class="o_data_row o_hp_invoice" t-att-class="{ o_hp_open: invOpen }"
+                                                t-on-click="() => this.toggleInvoice(inv.id)">
+                                                <td class="ps-4">
+                                                    <i t-attf-class="fa fa-fw me-1 text-muted {{ invOpen ? 'fa-caret-down' : 'fa-caret-right' }}"/>
+                                                    <span class="fw-semibold" t-esc="inv.name"/>
+                                                    <span t-if="inv.currency_note" class="badge text-bg-warning ms-2" t-esc="inv.currency_note"/>
+                                                </td>
+                                                <td t-esc="inv.date"/>
+                                                <td class="text-end">
+                                                    <i t-if="!inv.lines_ok" class="fa fa-exclamation-triangle text-warning me-1"
+                                                       title="A soma das linhas não coincide com o total da fatura"/>
+                                                    <t t-esc="inv.amount"/>
+                                                </td>
+                                            </tr>
+                                            <tr t-if="invOpen" class="o_hp_lines_row">
+                                                <td colspan="3" class="p-0">
+                                                    <div class="o_hp_lines">
+                                                        <table class="table table-sm mb-0">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Artigo</th>
+                                                                    <th>Descrição</th>
+                                                                    <th class="text-end">Qtd.</th>
+                                                                    <th>Un.</th>
+                                                                    <th class="text-end" title="Preço unitário sem IVA, antes de descontos">Preço unit. s/ IVA<br/><span class="fw-normal text-muted">(antes desc.)</span></th>
+                                                                    <th class="text-end">Desconto</th>
+                                                                    <th class="text-end" title="Valor da linha sem IVA, depois de todos os descontos">Valor líquido s/ IVA</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <tr t-foreach="inv.lines" t-as="line" t-key="line.id">
+                                                                    <td class="text-nowrap" t-esc="line.code"/>
+                                                                    <td t-esc="line.description"/>
+                                                                    <td class="text-end text-nowrap" t-esc="line.quantity"/>
+                                                                    <td t-esc="line.uom"/>
+                                                                    <td class="text-end text-nowrap" t-esc="line.price_unit"/>
+                                                                    <td class="text-end text-nowrap" t-att-title="line.discount_amount and ('Desconto: ' + line.discount_amount)">
+                                                                        <t t-if="line.discount" t-esc="line.discount"/>
+                                                                        <span t-else="" class="text-muted">—</span>
+                                                                    </td>
+                                                                    <td class="text-end text-nowrap fw-semibold" t-esc="line.amount"/>
+                                                                </tr>
+                                                            </tbody>
+                                                            <tfoot>
+                                                                <tr>
+                                                                    <td colspan="6" class="text-end text-muted">
+                                                                        <i t-if="inv.lines_ok" class="fa fa-check text-success me-1"
+                                                                           title="A soma das linhas confere com o total sem IVA da fatura"/>
+                                                                        Soma das linhas
+                                                                    </td>
+                                                                    <td class="text-end text-nowrap fw-bold" t-esc="inv.lines_total"/>
+                                                                </tr>
+                                                            </tfoot>
+                                                        </table>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </t>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </div>
+    </t>
+
+</templates>

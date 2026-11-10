@@ -1,0 +1,38 @@
+.o_historico_primavera {
+    padding: 1rem 1.25rem;
+
+    .o_hp_year,
+    .o_hp_invoice {
+        cursor: pointer;
+        user-select: none;
+    }
+    .o_hp_year th {
+        background-color: $o-gray-100;
+    }
+    .o_hp_date {
+        width: 9rem;
+    }
+    .o_hp_amount {
+        width: 11rem;
+    }
+    .o_hp_invoice.o_hp_open td {
+        background-color: rgba($o-action, 0.06);
+        border-bottom-width: 0;
+    }
+    .o_hp_lines {
+        margin: 0 0 0.75rem 2.75rem;
+        padding: 0.25rem 0.75rem;
+        border-left: 3px solid rgba($o-action, 0.35);
+        background-color: $o-view-background-color;
+        font-size: 0.92em;
+
+        thead th {
+            border-top: 0;
+            color: $o-gray-700;
+            vertical-align: bottom;
+        }
+        tfoot td {
+            border-bottom: 0;
+        }
+    }
+}
