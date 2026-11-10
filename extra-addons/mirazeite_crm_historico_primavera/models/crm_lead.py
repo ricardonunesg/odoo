@@ -305,12 +305,14 @@ class CrmLead(models.Model):
             "description": ln["Descricao"] or "",
             "quantity": _num(qtd, _casas(qtd, 0, 3)),
             "uom": ln["Unidade"] or "",
-            "price_unit": _eur(pu, _casas(pu)),
+            # Preços unitários mostrados sempre com 2 casas; só a apresentação é arredondada
+            # (valores, totais e preço líquido são calculados com a precisão original).
+            "price_unit": _eur(pu),
             "discount": " + ".join(partes),
             "discount_amount": _eur(desc_valor) if desc_valor else "",
             "amount": _eur(valor),
             "negative": valor < 0,
             "is_article": self._e_artigo(ln),
             "article_name": ln["DescArtigo"] or "",
-            "net_price": _eur(preco_liq, _casas(preco_liq)) if preco_liq is not None else "",
+            "net_price": _eur(preco_liq) if preco_liq is not None else "",
         }
