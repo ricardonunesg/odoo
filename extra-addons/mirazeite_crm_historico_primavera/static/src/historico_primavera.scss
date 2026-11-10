@@ -9,6 +9,15 @@
     .o_hp_year th {
         background-color: $o-gray-100;
     }
+    .o_hp_search {
+        max-width: 26rem;
+    }
+    .o_hp_lines tr.o_hp_match td {
+        background-color: rgba($warning, 0.18);
+    }
+    .o_hp_summary tfoot td {
+        border-bottom: 0;
+    }
     .o_hp_date {
         width: 9rem;
     }

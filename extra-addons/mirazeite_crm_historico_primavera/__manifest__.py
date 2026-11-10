@@ -1,6 +1,6 @@
 {
     "name": "CRM — Histórico Primavera",
-    "version": "18.0.1.1.0",
+    "version": "18.0.1.2.0",
     "summary": "Botão na oportunidade com as faturas e notas de crédito do cliente no Primavera (consulta em directo, só leitura)",
     "description": """
 Botão "Histórico Primavera" na ficha da oportunidade. Abre uma janela que lê
