@@ -35,23 +35,23 @@
                         </div>
                     </div>
                     <div class="text-end small text-muted">
-                        <div><t t-esc="data.period"/> · <t t-esc="data.doc_types"/></div>
-                        <div>Valores sem IVA · documentos anulados excluídos</div>
+                        <div><t t-esc="data.period"/> · valores sem IVA · anulados excluídos</div>
+                        <div>Faturas <t t-esc="data.doc_types"/> · Notas de crédito <t t-esc="data.credit_types"/></div>
                     </div>
                 </div>
 
                 <div t-if="!data.count" class="alert alert-info mb-0">
-                    <i class="fa fa-info-circle me-2"/>Sem faturas no período.
+                    <i class="fa fa-info-circle me-2"/>Sem faturas nem notas de crédito no período.
                 </div>
 
                 <t t-else="">
                     <div class="d-flex justify-content-end gap-2 mb-2">
                         <button class="btn btn-sm btn-link p-0" t-on-click="() => this.setAllInvoices(true)">
-                            <i class="fa fa-plus-square-o me-1"/>Expandir todas as faturas
+                            <i class="fa fa-plus-square-o me-1"/>Expandir todos os documentos
                         </button>
                         <span class="text-muted">|</span>
                         <button class="btn btn-sm btn-link p-0" t-on-click="() => this.setAllInvoices(false)">
-                            <i class="fa fa-minus-square-o me-1"/>Recolher faturas
+                            <i class="fa fa-minus-square-o me-1"/>Recolher documentos
                         </button>
                     </div>
 
@@ -59,7 +59,7 @@
                         <table class="o_list_table table table-sm table-hover mb-0">
                             <thead>
                                 <tr>
-                                    <th>Fatura</th>
+                                    <th>Documento</th>
                                     <th class="o_hp_date">Data</th>
                                     <th class="text-end o_hp_amount">Total sem IVA</th>
                                 </tr>
@@ -73,12 +73,17 @@
                                             <i t-attf-class="fa fa-fw me-1 {{ yearOpen ? 'fa-caret-down' : 'fa-caret-right' }}"/>
                                             <t t-esc="year.year"/>
                                             <span class="text-muted fw-normal ms-1">(<t t-esc="year.count"/>)</span>
+                                            <span t-if="year.count_credits" class="o_hp_year_split text-muted fw-normal ms-3">
+                                                <t t-esc="year.count_invoices"/> faturas <t t-esc="year.total_invoices"/>
+                                                · <t t-esc="year.count_credits"/> notas de crédito
+                                                <span class="text-danger" t-esc="year.total_credits"/>
+                                            </span>
                                         </th>
-                                        <th class="text-end" t-esc="year.total"/>
+                                        <th class="text-end text-nowrap" t-esc="year.total"/>
                                     </tr>
                                     <t t-if="yearOpen">
                                         <tr t-if="!year.count" class="o_hp_empty">
-                                            <td colspan="3" class="text-muted ps-5 fst-italic">Sem faturas neste ano.</td>
+                                            <td colspan="3" class="text-muted ps-5 fst-italic">Sem documentos neste ano.</td>
                                         </tr>
                                         <t t-foreach="year.invoices" t-as="inv" t-key="inv.id">
                                             <t t-set="invOpen" t-value="state.openInvoices[inv.id]"/>
@@ -87,10 +92,11 @@
                                                 <td class="ps-4">
                                                     <i t-attf-class="fa fa-fw me-1 text-muted {{ invOpen ? 'fa-caret-down' : 'fa-caret-right' }}"/>
                                                     <span class="fw-semibold" t-esc="inv.name"/>
+                                                    <span t-if="inv.is_credit" class="badge rounded-pill text-bg-danger ms-2">Nota de Crédito</span>
                                                     <span t-if="inv.currency_note" class="badge text-bg-warning ms-2" t-esc="inv.currency_note"/>
                                                 </td>
                                                 <td t-esc="inv.date"/>
-                                                <td class="text-end">
+                                                <td class="text-end text-nowrap" t-att-class="{ 'text-danger': inv.is_credit }">
                                                     <i t-if="!inv.lines_ok" class="fa fa-exclamation-triangle text-warning me-1"
                                                        title="A soma das linhas não coincide com o total da fatura"/>
                                                     <t t-esc="inv.amount"/>
@@ -122,7 +128,7 @@
                                                                         <t t-if="line.discount" t-esc="line.discount"/>
                                                                         <span t-else="" class="text-muted">—</span>
                                                                     </td>
-                                                                    <td class="text-end text-nowrap fw-semibold" t-esc="line.amount"/>
+                                                                    <td class="text-end text-nowrap fw-semibold" t-att-class="{ 'text-danger': line.negative }" t-esc="line.amount"/>
                                                                 </tr>
                                                             </tbody>
                                                             <tfoot>
@@ -132,7 +138,7 @@
                                                                            title="A soma das linhas confere com o total sem IVA da fatura"/>
                                                                         Soma das linhas
                                                                     </td>
-                                                                    <td class="text-end text-nowrap fw-bold" t-esc="inv.lines_total"/>
+                                                                    <td class="text-end text-nowrap fw-bold" t-att-class="{ 'text-danger': inv.is_credit }" t-esc="inv.lines_total"/>
                                                                 </tr>
                                                             </tfoot>
                                                         </table>
