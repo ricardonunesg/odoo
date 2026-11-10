@@ -4370,7 +4370,7 @@ class PrimaveraConnection(models.Model):
         total = sum(float(r["TotalMerc"] or 0) for r in rows)
         # Campos de texto vindos do Primavera são escapados (ex.: "&", "<"
         # em nomes de clientes) para não partir a tabela.
-        esc = lambda v: html.escape(str(v or ""), quote=True)  # noqa: E731
+        esc = lambda v: html.escape("" if v is None else str(v), quote=True)  # noqa: E731
         linhas = "".join(
             f"<tr>"
             f"<td>{esc(r['TipoDoc'])}</td>"
