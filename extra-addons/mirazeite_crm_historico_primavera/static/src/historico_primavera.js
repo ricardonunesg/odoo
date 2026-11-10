@@ -1,7 +1,7 @@
 /** @odoo-module **/
 import { Component, onWillStart, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
-import { useService } from "@web/core/utils/hooks";
+import { useAutofocus, useService } from "@web/core/utils/hooks";
 
 /** Texto para pesquisa: minúsculas e sem acentos. */
 function normalize(text) {
@@ -11,22 +11,45 @@ function normalize(text) {
         .replace(/[̀-ͯ]/g, "");
 }
 
-/** Valor em euros no formato português: -12.345,67 € */
-function formatEur(value) {
-    const v = Math.round((value || 0) * 100) / 100 || 0;
-    const [int, dec] = Math.abs(v).toFixed(2).split(".");
-    const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-    return `${v < 0 ? "-" : ""}${grouped},${dec} €`;
+/** Lista de artigos com pesquisa (aberta pelo botão "Pesquisar Artigo"). */
+class ArtigoPicker extends Component {
+    static template = "mirazeite_crm_historico_primavera.ArtigoPicker";
+    static props = { articles: Array, onSelect: Function, onClose: Function };
+
+    setup() {
+        this.state = useState({ query: "" });
+        useAutofocus();
+    }
+
+    get filtered() {
+        // Todas as palavras escritas têm de aparecer (por qualquer ordem) no código ou na descrição.
+        const words = normalize(this.state.query).split(/\s+/).filter(Boolean);
+        if (!words.length) {
+            return this.props.articles;
+        }
+        return this.props.articles.filter((a) => words.every((w) => a.searchText.includes(w)));
+    }
+
+    onKeydown(ev) {
+        if (ev.key === "Escape") {
+            ev.stopPropagation();
+            this.props.onClose();
+        } else if (ev.key === "Enter" && this.filtered.length === 1) {
+            this.props.onSelect(this.filtered[0].code);
+        }
+    }
 }
 
 /**
  * Janela "Histórico Primavera" (aberta a partir da oportunidade).
  * Os dados vêm em directo do Primavera (só leitura); nada é gravado no Odoo.
  * Anos expandidos por defeito; cada documento expande/recolhe as suas linhas.
- * A pesquisa por artigo filtra no browser os dados já carregados (sem nova consulta).
+ * "Pesquisar Artigo" mostra os movimentos de um artigo a partir dos dados já carregados,
+ * sem nova consulta e sem alterar a lista de documentos.
  */
 export class HistoricoPrimavera extends Component {
     static template = "mirazeite_crm_historico_primavera.Historico";
+    static components = { ArtigoPicker };
     static props = ["*"];
 
     setup() {
@@ -36,8 +59,8 @@ export class HistoricoPrimavera extends Component {
             data: null,
             closedYears: {},
             openInvoices: {},
-            search: "",
-            summaryYear: null,
+            pickerOpen: false,
+            article: null, // código do artigo seleccionado
         });
         onWillStart(() => this.load());
     }
@@ -45,70 +68,66 @@ export class HistoricoPrimavera extends Component {
     async load() {
         const leadId = this.props.action.params.lead_id;
         const data = await this.orm.call("crm.lead", "get_historico_primavera", [[leadId]]);
+        // Artigos vendidos ao cliente (sem duplicados), para a lista "Pesquisar Artigo".
+        const articles = new Map();
         for (const year of data.years || []) {
             for (const inv of year.invoices) {
                 for (const line of inv.lines) {
-                    line.searchText = normalize(`${line.code} ${line.description} ${line.article_name}`);
+                    if (!line.is_article) {
+                        continue;
+                    }
+                    if (!articles.has(line.code)) {
+                        articles.set(line.code, {
+                            code: line.code,
+                            name: line.article_name || line.description,
+                            texts: new Set([line.code, line.article_name]),
+                        });
+                    }
+                    articles.get(line.code).texts.add(line.description);
                 }
             }
         }
-        this.state.summaryYear = data.years && data.years.length ? data.years[0].year : null;
+        this.articles = [...articles.values()]
+            .map((a) => ({ code: a.code, name: a.name, searchText: normalize([...a.texts].join(" ")) }))
+            .sort((a, b) => a.code.localeCompare(b.code));
         this.state.data = data;
         this.state.loading = false;
     }
 
-    // --- Pesquisa por artigo -------------------------------------------------
+    // --- Pesquisar Artigo -----------------------------------------------------
 
-    get query() {
-        return normalize(this.state.search.trim());
+    togglePicker() {
+        this.state.pickerOpen = !this.state.pickerOpen;
     }
 
-    lineMatches(line) {
-        const q = this.query;
-        return Boolean(q) && line.searchText.includes(q);
+    selectArticle(code) {
+        this.state.article = code;
+        this.state.pickerOpen = false;
     }
 
-    /** Anos a mostrar: sem pesquisa, os originais; com pesquisa, só documentos com o artigo. */
-    get visibleYears() {
-        const q = this.query;
-        if (!q) {
-            return this.state.data.years;
-        }
-        return this.state.data.years.map((year) => {
-            const invoices = [];
-            let found = 0;
+    backToHistory() {
+        this.state.article = null;
+        this.state.pickerOpen = false;
+    }
+
+    get selectedArticle() {
+        return this.articles.find((a) => a.code === this.state.article);
+    }
+
+    /** Movimentos do artigo seleccionado, do mais recente para o mais antigo. */
+    get movements() {
+        const code = this.state.article;
+        const rows = [];
+        for (const year of this.state.data.years) {
             for (const inv of year.invoices) {
-                const lines = inv.lines.filter((l) => l.searchText.includes(q));
-                if (lines.length) {
-                    invoices.push(inv);
-                    found += lines.reduce((s, l) => s + l.value, 0);
+                for (const line of inv.lines) {
+                    if (line.is_article && line.code === code) {
+                        rows.push({ key: line.id, inv, line });
+                    }
                 }
             }
-            return { ...year, invoices, filtered: true, foundTotal: formatEur(found) };
-        });
-    }
-
-    get searchCount() {
-        return this.visibleYears.reduce((s, y) => s + y.invoices.length, 0);
-    }
-
-    matchCount(inv) {
-        return inv.lines.filter((l) => this.lineMatches(l)).length;
-    }
-
-    clearSearch() {
-        this.state.search = "";
-    }
-
-    // --- Resumo por artigo ----------------------------------------------------
-
-    get summary() {
-        const year = this.state.data.years.find((y) => y.year === this.state.summaryYear);
-        return year && year.summary;
-    }
-
-    setSummaryYear(year) {
-        this.state.summaryYear = year;
+        }
+        return rows; // documentos já vêm ordenados por data desc (ano atual primeiro)
     }
 
     // --- Expandir / recolher --------------------------------------------------
@@ -128,7 +147,7 @@ export class HistoricoPrimavera extends Component {
     setAllInvoices(open) {
         const opened = {};
         if (open) {
-            for (const year of this.visibleYears) {
+            for (const year of this.state.data.years) {
                 for (const inv of year.invoices) {
                     opened[inv.id] = true;
                 }

@@ -45,30 +45,32 @@
                 </div>
 
                 <t t-else="">
-                    <t t-set="years" t-value="visibleYears"/>
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                        <div class="o_hp_search input-group input-group-sm">
-                            <span class="input-group-text"><i class="fa fa-search"/></span>
-                            <input type="text" class="form-control" t-model="state.search"
-                                   placeholder="Pesquisar artigo (código ou descrição)…"/>
-                            <button t-if="state.search" class="btn btn-outline-secondary" title="Limpar pesquisa"
-                                    t-on-click="clearSearch"><i class="fa fa-times"/></button>
+                        <div class="o_hp_picker_wrap position-relative">
+                            <button class="btn btn-sm btn-primary" t-on-click="togglePicker">
+                                <i class="fa fa-search me-1"/>Pesquisar Artigo
+                            </button>
+                            <button t-if="state.article" class="btn btn-sm btn-secondary ms-2" t-on-click="backToHistory">
+                                <i class="fa fa-arrow-left me-1"/>Voltar ao histórico completo
+                            </button>
+                            <ArtigoPicker t-if="state.pickerOpen" articles="articles"
+                                          onSelect.bind="selectArticle" onClose.bind="togglePicker"/>
                         </div>
-                        <span t-if="query" class="small text-muted me-auto">
-                            <t t-esc="searchCount"/> documento(s) com este artigo
-                        </span>
-                        <div class="d-flex gap-2">
-                        <button class="btn btn-sm btn-link p-0" t-on-click="() => this.setAllInvoices(true)">
-                            <i class="fa fa-plus-square-o me-1"/>Expandir todos os documentos
-                        </button>
-                        <span class="text-muted">|</span>
-                        <button class="btn btn-sm btn-link p-0" t-on-click="() => this.setAllInvoices(false)">
-                            <i class="fa fa-minus-square-o me-1"/>Recolher documentos
-                        </button>
+                        <div t-if="!state.article" class="d-flex gap-2">
+                            <button class="btn btn-sm btn-link p-0" t-on-click="() => this.setAllInvoices(true)">
+                                <i class="fa fa-plus-square-o me-1"/>Expandir todos os documentos
+                            </button>
+                            <span class="text-muted">|</span>
+                            <button class="btn btn-sm btn-link p-0" t-on-click="() => this.setAllInvoices(false)">
+                                <i class="fa fa-minus-square-o me-1"/>Recolher documentos
+                            </button>
                         </div>
                     </div>
 
-                    <div class="o_list_renderer table-responsive">
+                    <!-- Histórico de vendas de um artigo (consulta sobre os dados já carregados) -->
+                    <t t-if="state.article" t-call="mirazeite_crm_historico_primavera.ArtigoMovimentos"/>
+
+                    <div t-else="" class="o_list_renderer table-responsive">
                         <table class="o_list_table table table-sm table-hover mb-0">
                             <thead>
                                 <tr>
@@ -78,20 +80,15 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <t t-foreach="years" t-as="year" t-key="year.year">
+                                <t t-foreach="data.years" t-as="year" t-key="year.year">
                                     <t t-set="yearOpen" t-value="isYearOpen(year.year)"/>
                                     <tr class="o_group_header o_hp_year" t-att-class="{ o_group_open: yearOpen }"
                                         t-on-click="() => this.toggleYear(year.year)">
                                         <th class="o_group_name" colspan="2">
                                             <i t-attf-class="fa fa-fw me-1 {{ yearOpen ? 'fa-caret-down' : 'fa-caret-right' }}"/>
                                             <t t-esc="year.year"/>
-                                            <t t-if="year.filtered">
-                                                <span class="text-muted fw-normal ms-1">(<t t-esc="year.invoices.length"/> de <t t-esc="year.count"/>)</span>
-                                                <span class="text-muted fw-normal ms-3">valor das linhas encontradas
-                                                    <span class="fw-semibold text-body" t-esc="year.foundTotal"/></span>
-                                            </t>
-                                            <span t-else="" class="text-muted fw-normal ms-1">(<t t-esc="year.count"/>)</span>
-                                            <span t-if="year.count_credits and !year.filtered" class="o_hp_year_split text-muted fw-normal ms-3">
+                                            <span class="text-muted fw-normal ms-1">(<t t-esc="year.count"/>)</span>
+                                            <span t-if="year.count_credits" class="o_hp_year_split text-muted fw-normal ms-3">
                                                 <t t-esc="year.count_invoices"/> faturas <t t-esc="year.total_invoices"/>
                                                 · <t t-esc="year.count_credits"/> notas de crédito
                                                 <span class="text-danger" t-esc="year.total_credits"/>
@@ -100,11 +97,8 @@
                                         <th class="text-end text-nowrap" t-esc="year.total"/>
                                     </tr>
                                     <t t-if="yearOpen">
-                                        <tr t-if="!year.invoices.length" class="o_hp_empty">
-                                            <td colspan="3" class="text-muted ps-5 fst-italic">
-                                                <t t-if="year.filtered">Sem documentos com este artigo neste ano.</t>
-                                                <t t-else="">Sem documentos neste ano.</t>
-                                            </td>
+                                        <tr t-if="!year.count" class="o_hp_empty">
+                                            <td colspan="3" class="text-muted ps-5 fst-italic">Sem documentos neste ano.</td>
                                         </tr>
                                         <t t-foreach="year.invoices" t-as="inv" t-key="inv.id">
                                             <t t-set="invOpen" t-value="state.openInvoices[inv.id]"/>
@@ -115,10 +109,6 @@
                                                     <span class="fw-semibold" t-esc="inv.name"/>
                                                     <span t-if="inv.is_credit" class="badge rounded-pill text-bg-danger ms-2">Nota de Crédito</span>
                                                     <span t-if="inv.currency_note" class="badge text-bg-warning ms-2" t-esc="inv.currency_note"/>
-                                                    <span t-if="year.filtered" class="badge rounded-pill text-bg-warning ms-2"
-                                                          title="Linhas deste documento com o artigo pesquisado">
-                                                        <t t-esc="matchCount(inv)"/> linha(s)
-                                                    </span>
                                                 </td>
                                                 <td t-esc="inv.date"/>
                                                 <td class="text-end text-nowrap" t-att-class="{ 'text-danger': inv.is_credit }">
@@ -143,8 +133,7 @@
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                <tr t-foreach="inv.lines" t-as="line" t-key="line.id"
-                                                                    t-att-class="{ o_hp_match: lineMatches(line) }">
+                                                                <tr t-foreach="inv.lines" t-as="line" t-key="line.id">
                                                                     <td class="text-nowrap" t-esc="line.code"/>
                                                                     <td t-esc="line.description"/>
                                                                     <td class="text-end text-nowrap" t-esc="line.quantity"/>
@@ -178,97 +167,116 @@
                         </table>
                     </div>
 
-                    <!-- Resumo de Compras por Artigo (calculado no servidor a partir das mesmas linhas) -->
-                    <t t-set="resumo" t-value="summary"/>
-                    <div class="o_hp_summary mt-4">
-                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                            <h5 class="mb-0"><i class="fa fa-cubes me-2 text-muted"/>Resumo de Compras por Artigo</h5>
-                            <div class="btn-group btn-group-sm" role="group">
-                                <t t-foreach="data.years" t-as="y" t-key="y.year">
-                                    <button type="button" class="btn"
-                                            t-att-class="state.summaryYear === y.year ? 'btn-primary' : 'btn-outline-primary'"
-                                            t-on-click="() => this.setSummaryYear(y.year)" t-esc="y.year"/>
-                                </t>
-                            </div>
-                        </div>
-                        <div class="small text-muted mb-2">
-                            Quantidades e valores líquidos sem IVA, com descontos e já deduzidas as notas de crédito.
-                            Ordenado por valor. Um artigo vendido em unidades diferentes aparece em linhas separadas.
-                        </div>
-                        <div t-if="!resumo.articles.length and !resumo.charges.length" class="text-muted fst-italic py-2">
-                            Sem compras em <t t-esc="state.summaryYear"/>.
-                        </div>
-                        <t t-else="">
-                            <div class="o_list_renderer table-responsive">
-                                <table class="o_list_table table table-sm table-hover mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>Artigo</th>
-                                            <th>Descrição</th>
-                                            <th class="text-end">Qtd. líquida</th>
-                                            <th>Un.</th>
-                                            <th class="text-end o_hp_amount">Valor líquido s/ IVA</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr t-foreach="resumo.articles" t-as="a" t-key="a.key">
-                                            <td class="text-nowrap" t-esc="a.code"/>
-                                            <td>
-                                                <t t-esc="a.description"/>
-                                                <i t-if="a.split_uom" class="fa fa-info-circle text-muted ms-1"
-                                                   title="Este artigo também foi vendido noutra unidade: aparece numa linha separada"/>
-                                            </td>
-                                            <td class="text-end text-nowrap" t-esc="a.quantity"/>
-                                            <td t-esc="a.uom"/>
-                                            <td class="text-end text-nowrap fw-semibold" t-att-class="{ 'text-danger': a.negative }" t-esc="a.amount"/>
-                                        </tr>
-                                    </tbody>
-                                    <tfoot>
-                                        <tr class="fw-bold">
-                                            <td colspan="4" class="text-end">Total artigos (<t t-esc="resumo.articles.length"/>)</td>
-                                            <td class="text-end text-nowrap" t-esc="resumo.total_articles"/>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-
-                            <t t-if="resumo.charges.length">
-                                <h6 class="mt-3 mb-2 text-muted">Portes, serviços e outros (fora do resumo de artigos)</h6>
-                                <div class="o_list_renderer table-responsive">
-                                    <table class="o_list_table table table-sm table-hover mb-0">
-                                        <thead>
-                                            <tr>
-                                                <th>Código</th>
-                                                <th>Descrição</th>
-                                                <th class="text-end">N.º linhas</th>
-                                                <th class="text-end o_hp_amount">Valor líquido s/ IVA</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr t-foreach="resumo.charges" t-as="e" t-key="e.key">
-                                                <td class="text-nowrap" t-esc="e.code or '—'"/>
-                                                <td t-esc="e.description"/>
-                                                <td class="text-end" t-esc="e.count"/>
-                                                <td class="text-end text-nowrap fw-semibold" t-att-class="{ 'text-danger': e.negative }" t-esc="e.amount"/>
-                                            </tr>
-                                        </tbody>
-                                        <tfoot>
-                                            <tr class="fw-bold">
-                                                <td colspan="3" class="text-end">Total portes, serviços e outros</td>
-                                                <td class="text-end text-nowrap" t-esc="resumo.total_charges"/>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            </t>
-                            <div class="d-flex justify-content-end gap-3 mt-2 pe-2 fw-bold">
-                                <span>Total líquido de <t t-esc="state.summaryYear"/></span>
-                                <span class="text-nowrap" t-esc="resumo.total"/>
-                            </div>
-                        </t>
-                    </div>
+                    <t t-call="mirazeite_crm_historico_primavera.ResumoArtigos"/>
                 </t>
             </t>
+        </div>
+    </t>
+
+    <!-- Lista de artigos com pesquisa -->
+    <t t-name="mirazeite_crm_historico_primavera.ArtigoPicker">
+        <div class="o_hp_picker border rounded shadow p-0" t-on-keydown="onKeydown">
+            <div class="p-2 border-bottom">
+                <input type="text" class="form-control form-control-sm" t-ref="autofocus" t-model="state.query"
+                       placeholder="Código ou descrição do artigo…"/>
+            </div>
+            <div class="o_hp_picker_list">
+                <t t-set="list" t-value="filtered"/>
+                <button t-foreach="list" t-as="a" t-key="a.code" type="button"
+                        class="dropdown-item d-flex gap-2 px-3 py-1" t-on-click="() => this.props.onSelect(a.code)">
+                    <span class="o_hp_picker_code text-nowrap fw-semibold" t-esc="a.code"/>
+                    <span class="text-truncate" t-esc="a.name"/>
+                </button>
+                <div t-if="!list.length" class="dropdown-item-text text-muted fst-italic">Nenhum artigo encontrado.</div>
+            </div>
+            <div class="px-2 py-1 border-top small text-muted">
+                <t t-esc="list.length"/> de <t t-esc="props.articles.length"/> artigos vendidos ao cliente
+            </div>
+        </div>
+    </t>
+
+    <!-- Movimentos do artigo seleccionado -->
+    <t t-name="mirazeite_crm_historico_primavera.ArtigoMovimentos">
+        <t t-set="art" t-value="selectedArticle"/>
+        <t t-set="movs" t-value="movements"/>
+        <div class="o_hp_article">
+            <div class="fs-6 mb-2">
+                <span class="badge text-bg-light border me-2" t-esc="art.code"/>
+                <span class="fw-semibold" t-esc="art.name"/>
+                <span class="text-muted small ms-2">— <t t-esc="movs.length"/> movimento(s), do mais recente para o mais antigo</span>
+            </div>
+            <div class="o_list_renderer table-responsive">
+                <table class="o_list_table table table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th class="o_hp_date">Data</th>
+                            <th>Documento</th>
+                            <th class="text-end">Quantidade</th>
+                            <th>Un.</th>
+                            <th class="text-end" title="Valor líquido da linha a dividir pela quantidade: sem IVA, depois do desconto de linha e do desconto global">
+                                Preço unit. líquido s/ IVA<br/><span class="fw-normal text-muted">(após descontos)</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="movs" t-as="m" t-key="m.key">
+                            <td t-esc="m.inv.date"/>
+                            <td>
+                                <span class="fw-semibold" t-esc="m.inv.name"/>
+                                <span t-if="m.inv.is_credit" class="badge rounded-pill text-bg-danger ms-2">Nota de Crédito</span>
+                            </td>
+                            <td class="text-end text-nowrap" t-att-class="{ 'text-danger': m.inv.is_credit }" t-esc="m.line.quantity"/>
+                            <td t-esc="m.line.uom"/>
+                            <td class="text-end text-nowrap" t-att-title="m.line.discount and ('Preço antes de descontos ' + m.line.price_unit + ' · desconto ' + m.line.discount)">
+                                <t t-esc="m.line.net_price"/>
+                                <i t-if="m.line.discount" class="fa fa-tag text-muted ms-1"/>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </t>
+
+    <!-- Resumo de Compras por Artigo: quantidades líquidas, ano anterior | ano atual -->
+    <t t-name="mirazeite_crm_historico_primavera.ResumoArtigos">
+        <t t-set="resumo" t-value="data.summary"/>
+        <div class="o_hp_summary mt-4">
+            <h5 class="mb-1"><i class="fa fa-cubes me-2 text-muted"/>Resumo de Compras por Artigo</h5>
+            <div class="small text-muted mb-2">
+                Quantidades líquidas vendidas (notas de crédito deduzidas), na unidade de venda. Ordenado por
+                <t t-esc="resumo.year_cur"/>. Um artigo vendido em unidades diferentes aparece em linhas separadas.
+                Portes, serviços e outros encargos não entram neste resumo.
+            </div>
+            <div t-if="!resumo.rows.length" class="text-muted fst-italic py-2">Sem artigos vendidos no período.</div>
+            <div t-else="" class="o_list_renderer table-responsive">
+                <table class="o_list_table table table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Artigo</th>
+                            <th>Descrição</th>
+                            <th class="text-end o_hp_qty"><t t-esc="resumo.year_prev"/> (unidades)</th>
+                            <th class="text-end o_hp_qty"><t t-esc="resumo.year_cur"/> (unidades)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="resumo.rows" t-as="r" t-key="r.key">
+                            <td class="text-nowrap" t-esc="r.code"/>
+                            <td>
+                                <t t-esc="r.description"/>
+                                <i t-if="r.split_uom" class="fa fa-info-circle text-muted ms-1"
+                                   title="Este artigo também foi vendido noutra unidade: aparece numa linha separada"/>
+                            </td>
+                            <td class="text-end text-nowrap" t-att-class="{ 'text-muted': r.zero_prev }">
+                                <t t-esc="r.q_prev"/> <span class="text-muted small" t-esc="r.uom"/>
+                            </td>
+                            <td class="text-end text-nowrap fw-semibold" t-att-class="{ 'text-muted fw-normal': r.zero_cur }">
+                                <t t-esc="r.q_cur"/> <span class="text-muted small fw-normal" t-esc="r.uom"/>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </t>
 

@@ -9,14 +9,25 @@
     .o_hp_year th {
         background-color: $o-gray-100;
     }
-    .o_hp_search {
-        max-width: 26rem;
+    .o_hp_picker {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        z-index: 1060;
+        width: 34rem;
+        max-width: 80vw;
+        margin-top: 0.25rem;
+        background-color: $o-view-background-color;
     }
-    .o_hp_lines tr.o_hp_match td {
-        background-color: rgba($warning, 0.18);
+    .o_hp_picker_list {
+        max-height: 20rem;
+        overflow-y: auto;
     }
-    .o_hp_summary tfoot td {
-        border-bottom: 0;
+    .o_hp_picker_code {
+        min-width: 10rem;
+    }
+    .o_hp_qty {
+        width: 11rem;
     }
     .o_hp_date {
         width: 9rem;

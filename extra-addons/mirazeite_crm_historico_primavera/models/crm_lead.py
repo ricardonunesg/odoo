@@ -20,9 +20,10 @@ TIPOS_NOTA_CREDITO = ("NC", "NCT", "NCDA", "NCDT", "DFRT")
 TIPOS = TIPOS_FATURA + TIPOS_NOTA_CREDITO
 # Linhas de comentário (sem valores) não são mostradas.
 TIPO_LINHA_COMENTARIO = "60"
-# Resumo por artigo: linhas sem artigo ou com artigo de serviço/despesa (TiposArtigo
+# "Pesquisar Artigo" e "Resumo de Compras por Artigo" só consideram artigos vendidos:
+# ficam de fora as linhas sem artigo e as de artigos de serviço/despesa (TiposArtigo
 # 0, 1, 2, 15 — ex.: SERV.001 Transporte/CIF/Freight, DIV.0001 Desconto P.P./Bónus,
-# cessão de exploração) ficam numa tabela à parte de portes, serviços e outros.
+# cessão de exploração), que continuam a aparecer nas linhas dos documentos.
 TIPOS_ARTIGO_ENCARGO = ("0", "1", "2", "15")
 
 # Só SELECT. Validado em todas as faturas e notas de crédito 2025–2026 (10/11/2026):
@@ -165,7 +166,7 @@ class CrmLead(models.Model):
             linhas_por_doc.setdefault(str(ln["IdCabecDoc"]), []).append(ln)
 
         grupos = {a: {"year": a, "invoices": [], "t": 0.0, "tf": 0.0, "tnc": 0.0, "nf": 0, "nnc": 0} for a in anos}
-        resumo = {a: ({}, {}) for a in anos}  # (artigos, encargos) por ano
+        resumo = {}  # (artigo, unidade) → quantidade líquida por ano
         docs_vistos = set()
         for c in cabecs:
             doc_id = str(c["Id"])
@@ -185,7 +186,7 @@ class CrmLead(models.Model):
                     valor = -abs(valor)
                 soma += valor
                 lines.append(self._hp_linha(ln, c, credito, valor))
-                self._hp_resumo_add(resumo[ano], ln, credito, valor)
+                self._hp_resumo_add(resumo, ano, ln, credito)
             g = grupos[ano]
             g["invoices"].append({
                 "id": doc_id,
@@ -219,7 +220,6 @@ class CrmLead(models.Model):
                 "total": _eur(g["t"]),
                 "total_invoices": _eur(g["tf"]),
                 "total_credits": _eur(g["tnc"]),
-                "summary": self._hp_resumo(*resumo[a]),
             })
         return {
             "customer": {
@@ -234,59 +234,54 @@ class CrmLead(models.Model):
             "credit_types": ", ".join(TIPOS_NOTA_CREDITO),
             "years": years,
             "count": len(docs_vistos),
+            "summary": self._hp_resumo(resumo, anos[1], anos[0]),
         }
 
     @staticmethod
-    def _hp_resumo_add(resumo, ln, credito, valor):
-        """Soma a linha ao resumo do ano: por artigo + unidade, ou nos encargos."""
-        artigos, encargos = resumo
-        codigo = (ln["Artigo"] or "").strip()
-        if not codigo or (ln["TipoArtigo"] or "").strip() in TIPOS_ARTIGO_ENCARGO:
-            desc = (ln["Descricao"] or ln["DescArtigo"] or "").strip()
-            e = encargos.setdefault((codigo, desc), {"code": codigo, "description": desc, "n": 0, "v": 0.0})
-            e["n"] += 1
-            e["v"] += valor
+    def _e_artigo(ln):
+        """Linha de artigo vendido (não é porte, serviço, desconto avulso nem linha sem artigo)."""
+        return bool((ln["Artigo"] or "").strip()) and (ln["TipoArtigo"] or "").strip() not in TIPOS_ARTIGO_ENCARGO
+
+    def _hp_resumo_add(self, resumo, ano, ln, credito):
+        """Soma a quantidade da linha ao resumo: por artigo + unidade (unidades diferentes não se somam)."""
+        if not self._e_artigo(ln):
             return
         qtd = ln["Quantidade"] or 0.0
         if credito:
             qtd = -abs(qtd)
-        uom = (ln["Unidade"] or "").strip()
-        a = artigos.setdefault((codigo, uom), {
-            "code": codigo, "uom": uom, "q": 0.0, "v": 0.0,
+        codigo, uom = ln["Artigo"].strip(), (ln["Unidade"] or "").strip()
+        r = resumo.setdefault((codigo, uom), {
+            "code": codigo, "uom": uom, "q": {},
             "description": (ln["DescArtigo"] or ln["Descricao"] or "").strip()})
-        a["q"] += qtd
-        a["v"] += valor
+        r["q"][ano] = r["q"].get(ano, 0.0) + qtd
 
     @staticmethod
-    def _hp_resumo(artigos, encargos):
+    def _hp_resumo(resumo, ano_ant, ano_atual):
+        """Tabela comparativa de quantidades líquidas: ano anterior | ano atual, por artigo + unidade."""
         codigos = {}
-        for code, _uom in artigos:
+        for code, _uom in resumo:
             codigos[code] = codigos.get(code, 0) + 1
-        arts = sorted(artigos.values(), key=lambda a: (-round(a["v"], 2), a["code"], a["uom"]))
-        encs = sorted(encargos.values(), key=lambda e: (-round(e["v"], 2), e["code"], e["description"]))
-        ta, te = sum(a["v"] for a in arts), sum(e["v"] for e in encs)
+
+        def fmt(q):
+            q = round(q, 3)
+            return _num(q, _casas(q, 0, 3))
+
+        rows = sorted(resumo.values(), key=lambda r: (
+            -round(r["q"].get(ano_atual, 0.0), 3), -round(r["q"].get(ano_ant, 0.0), 3), r["code"], r["uom"]))
         return {
-            "articles": [{
-                "key": f"{a['code']}|{a['uom']}",
-                "code": a["code"],
-                "description": a["description"],
-                "uom": a["uom"],
-                "quantity": _num(a["q"], _casas(a["q"], 0, 3)),
-                "amount": _eur(a["v"]),
-                "negative": round(a["v"], 2) < 0,
-                "split_uom": codigos[a["code"]] > 1,
-            } for a in arts],
-            "charges": [{
-                "key": f"{e['code']}|{e['description']}",
-                "code": e["code"],
-                "description": e["description"],
-                "count": e["n"],
-                "amount": _eur(e["v"]),
-                "negative": round(e["v"], 2) < 0,
-            } for e in encs],
-            "total_articles": _eur(ta),
-            "total_charges": _eur(te),
-            "total": _eur(ta + te),
+            "year_prev": ano_ant,
+            "year_cur": ano_atual,
+            "rows": [{
+                "key": f"{r['code']}|{r['uom']}",
+                "code": r["code"],
+                "description": r["description"],
+                "uom": r["uom"],
+                "q_prev": fmt(r["q"].get(ano_ant, 0.0)),
+                "q_cur": fmt(r["q"].get(ano_atual, 0.0)),
+                "zero_prev": round(r["q"].get(ano_ant, 0.0), 3) == 0,
+                "zero_cur": round(r["q"].get(ano_atual, 0.0), 3) == 0,
+                "split_uom": codigos[r["code"]] > 1,
+            } for r in rows],
         }
 
     def _hp_linha(self, ln, cabec, credito, valor):
@@ -300,6 +295,10 @@ class CrmLead(models.Model):
         if ln["TotalDF"] and cabec["DescPag"]:
             partes.append(_("%s %% financeiro") % _num(cabec["DescPag"]))
         desc_valor = abs(ln["TotalDA"] or 0.0) + abs(ln["TotalDC"] or 0.0) + abs(ln["TotalDF"] or 0.0)
+        # Preço unitário líquido efetivo: valor líquido da linha (já com desconto de linha,
+        # desconto global do cliente e financeiro) a dividir pela quantidade. Nas notas de
+        # crédito valor e quantidade são ambos negativos → preço positivo.
+        preco_liq = valor / qtd if qtd else None
         return {
             "id": str(ln["Id"]),
             "code": ln["Artigo"] or "",
@@ -311,6 +310,7 @@ class CrmLead(models.Model):
             "discount_amount": _eur(desc_valor) if desc_valor else "",
             "amount": _eur(valor),
             "negative": valor < 0,
-            "value": round(valor, 2),
+            "is_article": self._e_artigo(ln),
             "article_name": ln["DescArtigo"] or "",
+            "net_price": _eur(preco_liq, _casas(preco_liq)) if preco_liq is not None else "",
         }
